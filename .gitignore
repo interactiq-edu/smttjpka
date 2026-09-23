@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.npm-cache/
+.tmp-wrangler-config/
+.env*.local
+.wrangler/
+.dev.vars
+coverage/
+*.log
+bootstrap-admin.sql
+reset-admin-password.sql

@@ -1,0 +1,25 @@
+name = "interactiq-api"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+
+[vars]
+APP_ENV = "production"
+ALLOWED_ORIGIN = "https://interactiq-edu.github.io,http://localhost:5173,http://localhost:5174"
+# Cloudflare Workers' Web Crypto implementation supports at most 100,000
+# PBKDF2 iterations. Bootstrap and reset tooling use the same value.
+PBKDF2_ITERATIONS = "100000"
+SESSION_TTL_SECONDS = "28800"
+DEFAULT_TENANT_SLUG = "interactiq-intan"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "interactiq"
+database_id = "8b45fd60-33ee-40b6-8c3f-1f6e3f50f831"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "storage"
+
+[ai]
+binding = "AI"

@@ -1,0 +1,20 @@
+{
+  "name": "@interactiq/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --var RATE_LIMIT_PEPPER:interactiq-local-rate-limit-pepper-2026-only --var GOOGLE_CLIENT_ID:446044487497-7u6uadt545g7tejlgsfsfrl4e8ir9fsn.apps.googleusercontent.com",
+    "build": "wrangler deploy --dry-run",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@interactiq/contracts": "0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^5.0.1",
+    "wrangler": "^4.12.0"
+  }
+}
