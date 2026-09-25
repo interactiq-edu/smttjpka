@@ -41,6 +41,27 @@ describe('ResourceRepository tenant boundaries', () => {
     expect(fake.queries[0]).toContain('tenant_id = ? AND id = ?');
     expect(fake.values[0]).toEqual(['tenant-a', '3a209468-d64b-4d39-8c61-a1f5df3612f7']);
   });
+
+  it('loads live state together with the current presentation delivery', async () => {
+    const row = {
+      resourceId: '3a209468-d64b-4d39-8c61-a1f5df3612f7', assetUrl: '/api/v1/media/files/new-deck.pptx', externalUrl: null,
+      currentSlide: 4, currentZoom: 120, activeQuestionId: null, whiteboardJson: '[]', presentationMode: 'SLIDE' as const,
+      allowStudentDraw: 0, allowDownload: 0, showCurrentSlide: 1, showQuiz: 0, updatedAt: '2026-09-25 10:00:00',
+    };
+    const statement: D1PreparedStatement = {
+      bind: () => statement,
+      first: async <T>() => row as T,
+      all: async () => ({ results: [], success: true, meta: {} }),
+      run: async () => ({ results: [], success: true, meta: {} }),
+    };
+    const db: D1Database = { prepare: () => statement, batch: async () => [] };
+
+    const state = await new ResourceRepository(db).getLiveState('tenant-a', row.resourceId);
+
+    expect(state.assetUrl).toBe(row.assetUrl);
+    expect(state.currentSlide).toBe(4);
+    expect(state.currentZoom).toBe(120);
+  });
 });
 
 describe('class name normalisation', () => {

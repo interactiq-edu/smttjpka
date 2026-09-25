@@ -344,6 +344,9 @@ export interface LiveWhiteboardStroke {
 
 export interface LiveResourceState {
   resourceId: string;
+  /** Current delivery URLs are included so a connected student can swap media live. */
+  assetUrl?: string | null;
+  externalUrl?: string | null;
   currentSlide: number;
   currentZoom: number;
   activeQuestionId: string | null;

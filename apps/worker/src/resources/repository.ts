@@ -280,13 +280,19 @@ export class ResourceRepository {
   }
 
   async getLiveState(tenantId: string, resourceId: string): Promise<LiveResourceState> {
-    const row = await this.db.prepare(`SELECT resource_id AS resourceId, current_slide AS currentSlide, current_zoom AS currentZoom,
-      active_question_id AS activeQuestionId, whiteboard_json AS whiteboardJson, presentation_mode AS presentationMode,
-      allow_student_draw AS allowStudentDraw, allow_download AS allowDownload, show_current_slide AS showCurrentSlide, show_quiz AS showQuiz, updated_at AS updatedAt
-      FROM resource_live_states WHERE tenant_id = ? AND resource_id = ? LIMIT 1`).bind(tenantId, resourceId)
-      .first<{ resourceId: string; currentSlide: number; currentZoom: number; activeQuestionId: string | null; whiteboardJson: string; presentationMode: LiveResourceState['presentationMode']; allowStudentDraw: number; allowDownload: number; showCurrentSlide: number; showQuiz: number; updatedAt: string }>();
-    if (!row) return { resourceId, currentSlide: 1, currentZoom: 100, activeQuestionId: null, whiteboard: [], presentationMode: 'SLIDE', allowStudentDraw: false, allowDownload: false, showCurrentSlide: false, showQuiz: false, updatedAt: new Date(0).toISOString() };
-    return { resourceId: row.resourceId, currentSlide: row.currentSlide, currentZoom: row.currentZoom, activeQuestionId: row.activeQuestionId,
+    const row = await this.db.prepare(`SELECT r.id AS resourceId, r.asset_url AS assetUrl, r.external_url AS externalUrl,
+      COALESCE(s.current_slide, 1) AS currentSlide, COALESCE(s.current_zoom, 100) AS currentZoom,
+      s.active_question_id AS activeQuestionId, COALESCE(s.whiteboard_json, '[]') AS whiteboardJson,
+      COALESCE(s.presentation_mode, 'SLIDE') AS presentationMode,
+      COALESCE(s.allow_student_draw, 0) AS allowStudentDraw, COALESCE(s.allow_download, 0) AS allowDownload,
+      COALESCE(s.show_current_slide, 0) AS showCurrentSlide, COALESCE(s.show_quiz, 0) AS showQuiz,
+      COALESCE(s.updated_at, r.updated_at) AS updatedAt
+      FROM learning_resources r LEFT JOIN resource_live_states s
+        ON s.resource_id = r.id AND s.tenant_id = r.tenant_id
+      WHERE r.tenant_id = ? AND r.id = ? LIMIT 1`).bind(tenantId, resourceId)
+      .first<{ resourceId: string; assetUrl: string | null; externalUrl: string | null; currentSlide: number; currentZoom: number; activeQuestionId: string | null; whiteboardJson: string; presentationMode: LiveResourceState['presentationMode']; allowStudentDraw: number; allowDownload: number; showCurrentSlide: number; showQuiz: number; updatedAt: string }>();
+    if (!row) return { resourceId, assetUrl: null, externalUrl: null, currentSlide: 1, currentZoom: 100, activeQuestionId: null, whiteboard: [], presentationMode: 'SLIDE', allowStudentDraw: false, allowDownload: false, showCurrentSlide: false, showQuiz: false, updatedAt: new Date(0).toISOString() };
+    return { resourceId: row.resourceId, assetUrl: row.assetUrl, externalUrl: row.externalUrl, currentSlide: row.currentSlide, currentZoom: row.currentZoom, activeQuestionId: row.activeQuestionId,
       whiteboard: JSON.parse(row.whiteboardJson) as LiveWhiteboardStroke[], presentationMode: row.presentationMode,
       allowStudentDraw: Boolean(row.allowStudentDraw), allowDownload: Boolean(row.allowDownload), showCurrentSlide: Boolean(row.showCurrentSlide), showQuiz: Boolean(row.showQuiz), updatedAt: row.updatedAt };
   }
