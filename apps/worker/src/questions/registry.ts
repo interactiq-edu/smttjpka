@@ -70,7 +70,11 @@ const parseInteraction = (value: unknown, type: QuestionType): QuestionInteracti
   };
   if (interaction.kind !== expected[type]) throw new AuthError(400, 'VALIDATION_ERROR', 'The interactive setup does not match the selected question type.');
   if ((type === 'FILL_IN_THE_BLANKS' || type === 'DRAG_AND_DROP') && (typeof interaction.template !== 'string' || !interaction.template.trim() || !Array.isArray(interaction.blanks) || interaction.blanks.length < 1)) throw new AuthError(400, 'VALIDATION_ERROR', 'Add a sentence and at least one blank.');
-  if (type === 'REORDER' && (!Array.isArray(interaction.items) || interaction.items.length < 2 || interaction.items.length > 20 || interaction.items.some((item) => typeof item !== 'string' || !item.trim()))) throw new AuthError(400, 'VALIDATION_ERROR', 'Reorder needs between 2 and 20 complete items.');
+  if (type === 'REORDER') {
+    if (!Array.isArray(interaction.items) || interaction.items.length < 2 || interaction.items.length > 20 || interaction.items.some((item) => typeof item !== 'string' || !item.trim())) throw new AuthError(400, 'VALIDATION_ERROR', 'Reorder needs between 2 and 20 complete items.');
+    if (interaction.shufflePerStudent !== undefined && typeof interaction.shufflePerStudent !== 'boolean') throw new AuthError(400, 'VALIDATION_ERROR', 'The reorder reshuffle setting must be enabled or disabled.');
+    return { kind: 'reorder', items: interaction.items as string[], shufflePerStudent: interaction.shufflePerStudent !== false };
+  }
   if (type === 'CATEGORIZE') {
     const categories = interaction.categories;
     if (!Array.isArray(categories) || categories.length < 2 || categories.length > 8 || categories.some((category) => {

@@ -208,7 +208,7 @@ export type QuestionInteraction =
   | { kind: 'math_response'; calculator: boolean }
   | { kind: 'labelling'; imageUrl: string; labels: Array<{ id: string; text: string; x: number; y: number }>; distractors: string[] }
   | { kind: 'hotspot'; imageUrl: string; shape: 'point' | 'rectangle' | 'polygon'; regions: Array<{ id: string; points: Array<{ x: number; y: number }> }> }
-  | { kind: 'reorder'; items: string[] }
+  | { kind: 'reorder'; items: string[]; shufflePerStudent?: boolean }
   | { kind: 'categorize'; categories: Array<{ id: string; name: string; items: Array<{ id: string; text: string }> }>; partialCredit: boolean }
   | { kind: 'match'; pairs: Array<{ id: string; prompt: string; response: string }>; partialCredit: boolean }
   | { kind: 'match_table_grid'; rows: Array<{ id: string; text: string }>; columns: Array<{ id: string; text: string }>; correctCells: string[]; allowMultiplePerRow: boolean; partialCredit: boolean };
@@ -230,6 +230,82 @@ export interface LearningQuestion {
   timeLimitSeconds: number | null;
   position: number;
 }
+
+export const gradeQuestionAnswer = (question: LearningQuestion, value: string | string[]): { correct: boolean | null; points: number } => {
+  if (question.type === 'OPEN_ENDED' || question.type === 'PASSAGE') return { correct: null, points: 0 };
+  const interaction = question.interaction;
+  const clean = (item: string, accents = false) => {
+    const normalized = item.trim().toLocaleLowerCase().replace(/\s+/g, ' ');
+    return accents ? normalized.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : normalized;
+  };
+  if (interaction?.kind === 'fill_blank') {
+    const submitted = Array.isArray(value) ? value : [value];
+    const hits = interaction.blanks.filter((blank, index) => blank.answers.some((answer) => clean(answer, interaction.ignoreAccents) === clean(submitted[index] ?? '', interaction.ignoreAccents))).length;
+    return { correct: hits === interaction.blanks.length, points: question.points * hits / interaction.blanks.length };
+  }
+  if (interaction?.kind === 'drag_drop') {
+    const submitted = Array.isArray(value) ? value : [value];
+    const hits = interaction.blanks.filter((blank, index) => clean(blank.answer) === clean(submitted[index] ?? '')).length;
+    return { correct: hits === interaction.blanks.length, points: question.points * hits / interaction.blanks.length };
+  }
+  if (interaction?.kind === 'reorder') {
+    const submitted = Array.isArray(value) ? value : [value];
+    const correct = interaction.items.length === submitted.length && interaction.items.every((item, index) => clean(item) === clean(submitted[index] ?? ''));
+    return { correct, points: correct ? question.points : 0 };
+  }
+  if (interaction?.kind === 'categorize') {
+    const submitted = new Set(Array.isArray(value) ? value : [value]);
+    const expected = interaction.categories.flatMap((category) => category.items.map((item) => `${item.id}:${category.id}`));
+    const expectedSet = new Set(expected);
+    const hits = [...submitted].filter((item) => expectedSet.has(item)).length;
+    const wrong = [...submitted].filter((item) => !expectedSet.has(item)).length;
+    const correct = hits === expected.length && wrong === 0;
+    return { correct, points: correct || interaction.partialCredit ? question.points * hits / expected.length : 0 };
+  }
+  if (interaction?.kind === 'match') {
+    const submitted = new Set(Array.isArray(value) ? value : [value]);
+    const hits = interaction.pairs.filter((pair) => submitted.has(`${pair.id}:${pair.id}`)).length;
+    const correct = hits === interaction.pairs.length;
+    return { correct, points: correct || interaction.partialCredit ? question.points * hits / interaction.pairs.length : 0 };
+  }
+  if (interaction?.kind === 'match_table_grid') {
+    const submitted = new Set(Array.isArray(value) ? value : [value]);
+    const expected = new Set(interaction.correctCells);
+    const hits = [...submitted].filter((cell) => expected.has(cell)).length;
+    const wrong = [...submitted].filter((cell) => !expected.has(cell)).length;
+    const correct = hits === expected.size && wrong === 0;
+    return { correct, points: correct || interaction.partialCredit ? question.points * Math.max(0, hits - wrong) / expected.size : 0 };
+  }
+  if (interaction?.kind === 'math_response') {
+    const submitted = clean(Array.isArray(value) ? value.join('') : value).replace(/[×·]/g, '*').replace(/÷/g, '/');
+    const correct = question.acceptedAnswers.some((answer) => clean(answer).replace(/[×·]/g, '*').replace(/÷/g, '/') === submitted);
+    return { correct, points: correct ? question.points : 0 };
+  }
+  if (interaction?.kind === 'labelling') {
+    const submitted = new Set(Array.isArray(value) ? value : [value]);
+    const hits = interaction.labels.filter((label) => submitted.has(`${label.id}:${label.id}`)).length;
+    return { correct: hits === interaction.labels.length, points: question.points * hits / interaction.labels.length };
+  }
+  if (interaction?.kind === 'hotspot') {
+    try {
+      const point = JSON.parse(Array.isArray(value) ? value[0] ?? '' : value) as { x: number; y: number };
+      const inside = interaction.regions.some((region) => {
+        const xs = region.points.map((candidate) => candidate.x); const ys = region.points.map((candidate) => candidate.y);
+        return point.x >= Math.min(...xs) && point.x <= Math.max(...xs) && point.y >= Math.min(...ys) && point.y <= Math.max(...ys);
+      });
+      return { correct: inside, points: inside ? question.points : 0 };
+    } catch { return { correct: false, points: 0 }; }
+  }
+  if (['FILL_IN_THE_BLANKS', 'TABLE_FILL_IN', 'DRAG_AND_DROP', 'CATEGORIZE', 'MATCH', 'MATCH_TABLE_GRID', 'REORDER'].includes(question.type)) {
+    const normalized = (Array.isArray(value) ? value.join(' ') : value).trim().toLocaleLowerCase();
+    const correct = question.acceptedAnswers.includes(normalized);
+    return { correct, points: correct ? question.points : 0 };
+  }
+  const selected = new Set(Array.isArray(value) ? value : [value]);
+  const expected = new Set(question.options.filter((option) => option.isCorrect).map((option) => option.id));
+  const correct = selected.size === expected.size && [...selected].every((id) => expected.has(id));
+  return { correct, points: correct ? question.points : 0 };
+};
 
 export interface CreateQuestionInput {
   type: QuestionType;

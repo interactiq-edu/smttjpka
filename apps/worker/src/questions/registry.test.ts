@@ -69,4 +69,12 @@ describe('question registry', () => {
       { id: 'build', name: 'Construction', items: [{ id: 'brick', text: 'Brick' }] },
     ] } })).toMatchObject({ type: 'CATEGORIZE', interaction: { kind: 'categorize', partialCredit: true } });
   });
+
+  it('stores the per-student reorder reshuffle setting and defaults older questions to enabled', () => {
+    const interaction = { kind: 'reorder', items: ['First', 'Second', 'Third'] };
+    expect(parseQuestionInput({ type: 'REORDER', prompt, interaction }))
+      .toMatchObject({ interaction: { kind: 'reorder', shufflePerStudent: true } });
+    expect(parseQuestionInput({ type: 'REORDER', prompt, interaction: { ...interaction, shufflePerStudent: false } }))
+      .toMatchObject({ interaction: { kind: 'reorder', shufflePerStudent: false } });
+  });
 });
