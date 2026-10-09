@@ -358,6 +358,10 @@ export interface AttemptAnswerResult {
 
 export interface QuestionCheckResult extends AttemptAnswerResult {}
 
+export interface OpenEndedPreviewGradeResult extends QuestionCheckResult {
+  aiFeedback: string;
+}
+
 export interface AttemptSubmissionInput {
   answers: AttemptAnswerInput[];
   fullName: string;

@@ -428,6 +428,15 @@ export const app = {
         await auth.requireCsrf(session.token, csrfToken);
         return json(request, env, { success: true, data: await questions.create(session.data.tenant.id, session.data.user.id, resourceId, await parseJson(request)) }, { status: 201 });
       }
+      const previewGradeRoute = /^\/api\/v1\/resources\/([0-9a-f-]{36})\/questions\/([0-9a-f-]{36})\/preview-grade$/i.exec(url.pathname);
+      if (request.method === 'POST' && previewGradeRoute) {
+        const session = await authenticatedSession(request, env, auth);
+        requirePermission(toTenantContext(session.data), 'resource.update');
+        const csrfToken = request.headers.get('x-csrf-token');
+        if (!csrfToken) throw new AuthError(403, 'FORBIDDEN', 'CSRF validation failed.');
+        await auth.requireCsrf(session.token, csrfToken);
+        return json(request, env, { success: true, data: await attempts.previewOpenEnded(session.data.tenant.id, previewGradeRoute[1]!, previewGradeRoute[2]!, await parseJson(request)) });
+      }
       const flashcardRoute = /^\/api\/v1\/resources\/([0-9a-f-]{36})\/flashcards(?:\/([0-9a-f-]{36}))?$/i.exec(url.pathname);
       if (flashcardRoute && ['GET','POST','PATCH','DELETE'].includes(request.method)) {
         const session = await authenticatedSession(request, env, auth); const resourceId = flashcardRoute[1]!; const cardId = flashcardRoute[2] ?? null;

@@ -73,6 +73,27 @@ describe('human-readable review answers', () => {
   });
 });
 
+describe('AI preview marking', () => {
+  it('grades an open-ended prototype from teacher key ideas without writing an attempt', async () => {
+    const statement: D1PreparedStatement = {
+      bind: () => statement,
+      first: async () => null,
+      all: async <T,>() => ({ results: [{
+        id: 'question-1', type: 'OPEN_ENDED', promptJson: JSON.stringify({ type:'doc', content:[{type:'paragraph',content:[{type:'text',text:'Explain independence'}]}] }),
+        configurationJson: JSON.stringify({ options:[], acceptedAnswers:['self-government','sovereignty'], interaction:null }), points:4, timeLimitSeconds:null, position:0,
+      }] as T[], success:true, meta:{} }),
+      run: async () => { throw new Error('Preview grading must not write to D1.'); },
+    };
+    const db: D1Database = { prepare: () => statement, batch: async () => { throw new Error('Preview grading must not batch writes.'); } };
+    let aiInput: Record<string,unknown> | null = null;
+    const service = new AttemptService(db, { run: async (_model,input) => { aiInput=input; return { response:{ points:3, feedback:'The answer covers sovereignty but only partially explains self-government.' } }; } });
+    const result = await service.previewOpenEnded('tenant-1','resource-1','question-1',{ value:'The country has sovereignty and governs itself.' });
+    expect(result).toEqual({ questionId:'question-1', correct:null, points:3, maxPoints:4, aiFeedback:'The answer covers sovereignty but only partially explains self-government.' });
+    expect(JSON.stringify(aiInput)).toContain('self-government');
+    expect(JSON.stringify(aiInput)).toContain('Untrusted student response');
+  });
+});
+
 describe('resource-scoped student attempts', () => {
   it('restores the in-progress attempt and student identity after a browser refresh', async () => {
     let inserted=false;
