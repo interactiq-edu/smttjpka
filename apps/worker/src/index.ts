@@ -412,6 +412,18 @@ export const app = {
         await auth.requireCsrf(session.token, csrfToken);
         return json(request, env, { success: true, data: await resources.create(session.data.tenant.id, session.data.user.id, await parseJson(request)) }, { status: 201 });
       }
+      const folderRoute = /^\/api\/v1\/resource-folders(?:\/([0-9a-f-]{36}))?$/i.exec(url.pathname);
+      if (folderRoute && ['GET','POST','PATCH'].includes(request.method)) {
+        const session = await authenticatedSession(request, env, auth);
+        requirePermission(toTenantContext(session.data), request.method === 'GET' ? 'resource.read' : 'resource.update');
+        if (request.method === 'GET') return json(request, env, { success: true, data: await resources.listFolders(session.data.tenant.id) });
+        const csrfToken = request.headers.get('x-csrf-token');
+        if (!csrfToken) throw new AuthError(403, 'FORBIDDEN', 'CSRF validation failed.');
+        await auth.requireCsrf(session.token, csrfToken);
+        if (request.method === 'POST') return json(request, env, { success: true, data: await resources.createFolder(session.data.tenant.id, session.data.user.id, await parseJson(request)) }, { status: 201 });
+        if (!folderRoute[1]) throw new AuthError(400, 'VALIDATION_ERROR', 'Select a folder.');
+        return json(request, env, { success: true, data: await resources.renameFolder(session.data.tenant.id, folderRoute[1], await parseJson(request)) });
+      }
       const questionRoute = /^\/api\/v1\/resources\/([0-9a-f-]{36})\/questions$/i.exec(url.pathname);
       if (questionRoute && (request.method === 'GET' || request.method === 'POST')) {
         const resourceId = questionRoute[1]!;
@@ -468,7 +480,7 @@ export const app = {
       if (request.method === 'POST' && duplicateRoute) {
         const session = await authenticatedSession(request, env, auth); requirePermission(toTenantContext(session.data), 'resource.create');
         const csrfToken = request.headers.get('x-csrf-token'); if (!csrfToken) throw new AuthError(403, 'FORBIDDEN', 'CSRF validation failed.'); await auth.requireCsrf(session.token, csrfToken);
-        return json(request, env, { success: true, data: await resources.duplicate(session.data.tenant.id, session.data.user.id, duplicateRoute[1]!) }, { status: 201 });
+        return json(request, env, { success: true, data: await resources.duplicate(session.data.tenant.id, session.data.user.id, duplicateRoute[1]!, await parseJson(request)) }, { status: 201 });
       }
       const liveRoute = /^\/api\/v1\/resources\/([0-9a-f-]{36})\/live$/i.exec(url.pathname);
       if (liveRoute && (request.method === 'GET' || request.method === 'PATCH')) {
@@ -598,6 +610,19 @@ export const app = {
         if (resourceActionRoute[2] === 'theme') return json(request, env, { success: true, data: await resources.updateTheme(session.data.tenant.id, resourceActionRoute[1]!, await parseJson(request)) });
         const publishSettings = request.headers.get('content-type')?.includes('application/json') ? await parseJson(request) : {};
         const data=await resources.publish(session.data.tenant.id, resourceActionRoute[1]!, publishSettings);publicJoinCache.clear();return json(request, env, { success: true, data });
+      }
+      const resourceLibraryRoute = /^\/api\/v1\/resources\/([0-9a-f-]{36})\/(metadata|folder)$/i.exec(url.pathname);
+      if (request.method === 'PATCH' && resourceLibraryRoute) {
+        const session = await authenticatedSession(request, env, auth);
+        requirePermission(toTenantContext(session.data), 'resource.update');
+        const csrfToken = request.headers.get('x-csrf-token');
+        if (!csrfToken) throw new AuthError(403, 'FORBIDDEN', 'CSRF validation failed.');
+        await auth.requireCsrf(session.token, csrfToken);
+        const body = await parseJson(request);
+        const data = resourceLibraryRoute[2] === 'metadata'
+          ? await resources.updateMetadata(session.data.tenant.id, resourceLibraryRoute[1]!, body)
+          : await resources.moveToFolder(session.data.tenant.id, resourceLibraryRoute[1]!, body);
+        return json(request, env, { success: true, data });
       }
       if ((request.method === 'GET' || request.method === 'PATCH' || request.method === 'DELETE') && url.pathname.startsWith('/api/v1/resources/')) {
         const resourceId = url.pathname.slice('/api/v1/resources/'.length);

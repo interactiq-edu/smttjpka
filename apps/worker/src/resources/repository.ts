@@ -1,4 +1,4 @@
-import type { AttemptPolicy, DashboardOverview, Flashcard, LearningResourceDetail, LearningResourceSummary, LiveResourceState, LiveWhiteboardStroke, QuizTheme, ResourceStatus, ResourceType, ResourceVisibility, ResultReleasePolicy, RichTextDocument, TenantThemeSettings } from '@interactiq/contracts';
+import type { AttemptPolicy, DashboardOverview, Flashcard, LearningResourceDetail, LearningResourceSummary, LiveResourceState, LiveWhiteboardStroke, QuizTheme, ResourceFolder, ResourceStatus, ResourceType, ResourceVisibility, ResultReleasePolicy, RichTextDocument, TenantThemeSettings } from '@interactiq/contracts';
 import type { D1Database } from '../db/types';
 
 interface ResourceRow {
@@ -19,6 +19,7 @@ interface ResourceRow {
   assignedClassName: string | null;
   submissionDueAt: string | null;
   assignmentMaxScore: number;
+  folderId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,7 +28,7 @@ const resourceSelect = `id, title, description, resource_type AS type, status, v
   share_code AS shareCode, published_at AS publishedAt, theme_id AS themeId, asset_url AS assetUrl,
   external_url AS externalUrl, attempt_policy AS attemptPolicy, result_release_policy AS resultReleasePolicy, access_starts_at AS accessStartsAt,
   assigned_class_name AS assignedClassName, submission_due_at AS submissionDueAt,
-  assignment_max_score AS assignmentMaxScore,
+  assignment_max_score AS assignmentMaxScore, folder_id AS folderId,
   created_at AS createdAt, updated_at AS updatedAt`;
 
 export class ResourceRepository {
@@ -74,7 +75,7 @@ export class ResourceRepository {
       r.share_code AS shareCode, r.published_at AS publishedAt, r.theme_id AS themeId, r.asset_url AS assetUrl, r.external_url AS externalUrl,
       r.attempt_policy AS attemptPolicy, r.result_release_policy AS resultReleasePolicy, r.access_starts_at AS accessStartsAt,
       r.assigned_class_name AS assignedClassName, r.submission_due_at AS submissionDueAt,
-      r.assignment_max_score AS assignmentMaxScore,
+      r.assignment_max_score AS assignmentMaxScore, r.folder_id AS folderId,
       r.created_at AS createdAt, r.updated_at AS updatedAt, r.content_json AS contentJson,
       r.tenant_id AS tenantId, t.slug AS tenantSlug, t.name AS tenantName
       FROM learning_resources r JOIN tenants t ON t.id = r.tenant_id
@@ -175,6 +176,40 @@ export class ResourceRepository {
       .bind(JSON.stringify(content), tenantId, resourceId)
       .run();
     return this.findDetailById(tenantId, resourceId);
+  }
+
+  async updateMetadata(tenantId: string, resourceId: string, title: string, description: string | null): Promise<LearningResourceSummary | null> {
+    await this.db.prepare('UPDATE learning_resources SET title = ?, description = ?, updated_at = CURRENT_TIMESTAMP WHERE tenant_id = ? AND id = ?')
+      .bind(title, description, tenantId, resourceId).run();
+    return this.findById(tenantId, resourceId);
+  }
+
+  async listFolders(tenantId: string): Promise<ResourceFolder[]> {
+    const result = await this.db.prepare(`SELECT id, name, created_at AS createdAt, updated_at AS updatedAt
+      FROM resource_folders WHERE tenant_id = ? ORDER BY name COLLATE NOCASE`).bind(tenantId).all<ResourceFolder>();
+    return result.results;
+  }
+
+  async createFolder(tenantId: string, userId: string, name: string): Promise<ResourceFolder> {
+    const id = crypto.randomUUID();
+    await this.db.prepare('INSERT INTO resource_folders (id, tenant_id, created_by_user_id, name) VALUES (?, ?, ?, ?)')
+      .bind(id, tenantId, userId, name).run();
+    return (await this.db.prepare(`SELECT id, name, created_at AS createdAt, updated_at AS updatedAt FROM resource_folders
+      WHERE tenant_id = ? AND id = ?`).bind(tenantId, id).first<ResourceFolder>())!;
+  }
+
+  async renameFolder(tenantId: string, folderId: string, name: string): Promise<ResourceFolder | null> {
+    await this.db.prepare('UPDATE resource_folders SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE tenant_id = ? AND id = ?')
+      .bind(name, tenantId, folderId).run();
+    return this.db.prepare(`SELECT id, name, created_at AS createdAt, updated_at AS updatedAt FROM resource_folders
+      WHERE tenant_id = ? AND id = ?`).bind(tenantId, folderId).first<ResourceFolder>();
+  }
+
+  async moveToFolder(tenantId: string, resourceId: string, folderId: string | null): Promise<LearningResourceSummary | null> {
+    await this.db.prepare(`UPDATE learning_resources SET folder_id = ?, updated_at = CURRENT_TIMESTAMP WHERE tenant_id = ? AND id = ?
+      AND (? IS NULL OR EXISTS (SELECT 1 FROM resource_folders WHERE tenant_id = ? AND id = ?))`)
+      .bind(folderId, tenantId, resourceId, folderId, tenantId, folderId).run();
+    return this.findById(tenantId, resourceId);
   }
 
   async publish(tenantId: string, resourceId: string, shareCode: string, attemptPolicy: AttemptPolicy, resultReleasePolicy: ResultReleasePolicy, accessStartsAt: string | null): Promise<LearningResourceSummary | null> {

@@ -1,4 +1,4 @@
-import type { AttemptPolicy, CreateLearningResourceInput, Flashcard, LearningResourceDetail, LearningResourceSummary, LiveResourceState, LiveWhiteboardStroke, PublishedResource, QuizTheme, ResourceType, ResultReleasePolicy, RichTextDocument, RichTextMark, RichTextNode, TenantThemeSettings } from '@interactiq/contracts';
+import type { AttemptPolicy, CreateLearningResourceInput, Flashcard, LearningResourceDetail, LearningResourceSummary, LiveResourceState, LiveWhiteboardStroke, PublishedResource, QuizTheme, ResourceFolder, ResourceType, ResultReleasePolicy, RichTextDocument, RichTextMark, RichTextNode, TenantThemeSettings } from '@interactiq/contracts';
 import { AuthError } from '../auth/service';
 import { QuestionRepository } from '../questions/repository';
 import { ResourceRepository } from './repository';
@@ -76,6 +76,45 @@ export class ResourceService {
 
   list(tenantId: string): Promise<LearningResourceSummary[]> {
     return this.resources.list(tenantId);
+  }
+
+  listFolders(tenantId: string): Promise<ResourceFolder[]> { return this.resources.listFolders(tenantId); }
+
+  async createFolder(tenantId: string, userId: string, body: unknown): Promise<ResourceFolder> {
+    const name = this.folderName(body);
+    try { return await this.resources.createFolder(tenantId, userId, name); }
+    catch { throw new AuthError(409, 'VALIDATION_ERROR', 'A folder with this name already exists.'); }
+  }
+
+  async renameFolder(tenantId: string, folderId: string, body: unknown): Promise<ResourceFolder> {
+    const name = this.folderName(body);
+    try {
+      const folder = await this.resources.renameFolder(tenantId, folderId, name);
+      if (!folder) throw new AuthError(404, 'VALIDATION_ERROR', 'The requested folder does not exist.');
+      return folder;
+    } catch (error) {
+      if (error instanceof AuthError) throw error;
+      throw new AuthError(409, 'VALIDATION_ERROR', 'A folder with this name already exists.');
+    }
+  }
+
+  async moveToFolder(tenantId: string, resourceId: string, body: unknown): Promise<LearningResourceSummary> {
+    const raw = body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>).folderId : undefined;
+    if (raw !== null && (typeof raw !== 'string' || !/^[0-9a-f-]{36}$/i.test(raw))) throw new AuthError(400, 'VALIDATION_ERROR', 'Select a valid folder.');
+    const resource = await this.resources.moveToFolder(tenantId, resourceId, raw as string | null);
+    if (!resource || resource.folderId !== raw) throw new AuthError(404, 'VALIDATION_ERROR', 'The resource or folder does not exist.');
+    return resource;
+  }
+
+  async updateMetadata(tenantId: string, resourceId: string, body: unknown): Promise<LearningResourceSummary> {
+    const input = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
+    const title = typeof input.title === 'string' ? input.title.trim() : '';
+    const description = typeof input.description === 'string' ? input.description.trim() : '';
+    if (!title || title.length > 160) throw new AuthError(400, 'VALIDATION_ERROR', 'A title between 1 and 160 characters is required.');
+    if (description.length > 2000) throw new AuthError(400, 'VALIDATION_ERROR', 'Description must have at most 2000 characters.');
+    const resource = await this.resources.updateMetadata(tenantId, resourceId, title, description || null);
+    if (!resource) throw new AuthError(404, 'VALIDATION_ERROR', 'The requested resource does not exist.');
+    return resource;
   }
 
   async create(tenantId: string, userId: string, body: unknown): Promise<LearningResourceSummary> {
@@ -175,10 +214,13 @@ export class ResourceService {
     return resource;
   }
 
-  async duplicate(tenantId: string, userId: string, resourceId: string): Promise<LearningResourceSummary> {
+  async duplicate(tenantId: string, userId: string, resourceId: string, body?: unknown): Promise<LearningResourceSummary> {
     const source = await this.resources.findDetailById(tenantId, resourceId);
     if (!source) throw new AuthError(404, 'VALIDATION_ERROR', 'The requested resource does not exist.');
-    const copy = await this.resources.create({ id: crypto.randomUUID(), tenantId, userId, title: `${source.title} (Copy)`,
+    const requestedTitle = body && typeof body === 'object' && !Array.isArray(body) && typeof (body as Record<string, unknown>).title === 'string'
+      ? String((body as Record<string, unknown>).title).trim() : `${source.title} (Copy)`;
+    if (!requestedTitle || requestedTitle.length > 160) throw new AuthError(400, 'VALIDATION_ERROR', 'A title between 1 and 160 characters is required.');
+    const copy = await this.resources.create({ id: crypto.randomUUID(), tenantId, userId, title: requestedTitle,
       description: source.description, type: source.type, attemptPolicy: source.attemptPolicy, assignedClassName: source.assignedClassName });
     await this.resources.updateContent(tenantId, copy.id, source.content);
     await this.resources.updateTheme(tenantId, copy.id, source.themeId);
@@ -236,6 +278,13 @@ export class ResourceService {
 
   async delete(tenantId: string, resourceId: string): Promise<void> {
     if (!await this.resources.delete(tenantId, resourceId)) throw new AuthError(404, 'VALIDATION_ERROR', 'The requested resource does not exist.');
+  }
+
+  private folderName(body: unknown): string {
+    const name = body && typeof body === 'object' && !Array.isArray(body) && typeof (body as Record<string, unknown>).name === 'string'
+      ? String((body as Record<string, unknown>).name).trim() : '';
+    if (!name || name.length > 80) throw new AuthError(400, 'VALIDATION_ERROR', 'A folder name between 1 and 80 characters is required.');
+    return name;
   }
 
   private async requireType(tenantId: string, resourceId: string, type: ResourceType): Promise<void> {

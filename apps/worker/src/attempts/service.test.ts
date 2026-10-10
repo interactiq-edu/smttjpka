@@ -32,13 +32,26 @@ describe('automatic grading', () => {
   it('grades reorder chains in the teacher-defined order', () => {
     const question: LearningQuestion = { ...baseQuestion, type: 'REORDER', options: [], acceptedAnswers: [], interaction: { kind: 'reorder', items: ['Seed', 'Plant', 'Flower'] } };
     expect(gradeAnswer(question, ['Seed', 'Plant', 'Flower'])).toEqual({ correct: true, points: 2 });
-    expect(gradeAnswer(question, ['Flower', 'Plant', 'Seed'])).toEqual({ correct: false, points: 0 });
+    expect(gradeAnswer(question, ['Flower', 'Plant', 'Seed'])).toEqual({ correct: false, points: 2 / 3 });
+  });
+
+  it('awards three of four marks when three sequence steps remain in order', () => {
+    const question: LearningQuestion = { ...baseQuestion, points: 4, type: 'REORDER', options: [], acceptedAnswers: [], interaction: { kind: 'reorder', items: ['One', 'Two', 'Three', 'Four'] } };
+    expect(gradeAnswer(question, ['One', 'Two', 'Four', 'Three'])).toEqual({ correct: false, points: 3 });
   });
 
   it('awards partial credit for correctly matched pairs', () => {
     const question: LearningQuestion = { ...baseQuestion, type: 'MATCH', options: [], acceptedAnswers: [], interaction: { kind: 'match', partialCredit: true, pairs: [{ id: 'rock', prompt: 'Rock', response: 'Construction' }, { id: 'veg', prompt: 'Vegetable', response: 'Food' }] } };
     expect(gradeAnswer(question, ['rock:rock', 'veg:wrong'])).toEqual({ correct: false, points: 1 });
     expect(gradeAnswer(question, ['rock:rock', 'veg:veg'])).toEqual({ correct: true, points: 2 });
+  });
+
+  it('keeps duplicate visible match answers distinct and grades three of four pairs', () => {
+    const question: LearningQuestion = { ...baseQuestion, points: 4, type: 'MATCH', options: [], acceptedAnswers: [], interaction: { kind: 'match', partialCredit: false, pairs: [
+      { id: 'one', prompt: 'Load wall', response: 'Engineering brick' }, { id: 'two', prompt: 'Drain', response: 'engineering BRICK' },
+      { id: 'three', prompt: 'Partition', response: 'Common brick' }, { id: 'four', prompt: 'Paving', response: 'Common brick' },
+    ] } };
+    expect(gradeAnswer(question, ['one:one','two:two','three:three','four:wrong'])).toEqual({ correct:false, points:3 });
   });
 
   it('grades match-table cells and penalizes extra selections', () => {

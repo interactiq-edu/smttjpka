@@ -105,6 +105,14 @@ export interface LearningResourceSummary {
   assignedClassName: string | null;
   submissionDueAt: string | null;
   assignmentMaxScore: number;
+  folderId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ResourceFolder {
+  id: string;
+  name: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -250,8 +258,18 @@ export const gradeQuestionAnswer = (question: LearningQuestion, value: string | 
   }
   if (interaction?.kind === 'reorder') {
     const submitted = Array.isArray(value) ? value : [value];
-    const correct = interaction.items.length === submitted.length && interaction.items.every((item, index) => clean(item) === clean(submitted[index] ?? ''));
-    return { correct, points: correct ? question.points : 0 };
+    const expected = interaction.items.map((item) => clean(item));
+    const actual = submitted.map((item) => clean(item));
+    // Longest common subsequence rewards the steps that remain in the correct
+    // relative order without turning one misplaced step into a zero mark.
+    const lengths = Array.from({ length: expected.length + 1 }, () => Array(actual.length + 1).fill(0) as number[]);
+    for (let left = 1; left <= expected.length; left += 1) for (let right = 1; right <= actual.length; right += 1) {
+      lengths[left]![right] = expected[left - 1] === actual[right - 1]
+        ? lengths[left - 1]![right - 1]! + 1
+        : Math.max(lengths[left - 1]![right]!, lengths[left]![right - 1]!);
+    }
+    const hits = lengths[expected.length]![actual.length]!;
+    return { correct: hits === expected.length && actual.length === expected.length, points: expected.length ? question.points * hits / expected.length : 0 };
   }
   if (interaction?.kind === 'categorize') {
     const submitted = new Set(Array.isArray(value) ? value : [value]);
@@ -260,13 +278,13 @@ export const gradeQuestionAnswer = (question: LearningQuestion, value: string | 
     const hits = [...submitted].filter((item) => expectedSet.has(item)).length;
     const wrong = [...submitted].filter((item) => !expectedSet.has(item)).length;
     const correct = hits === expected.length && wrong === 0;
-    return { correct, points: correct || interaction.partialCredit ? question.points * hits / expected.length : 0 };
+    return { correct, points: expected.length ? question.points * hits / expected.length : 0 };
   }
   if (interaction?.kind === 'match') {
     const submitted = new Set(Array.isArray(value) ? value : [value]);
     const hits = interaction.pairs.filter((pair) => submitted.has(`${pair.id}:${pair.id}`)).length;
     const correct = hits === interaction.pairs.length;
-    return { correct, points: correct || interaction.partialCredit ? question.points * hits / interaction.pairs.length : 0 };
+    return { correct, points: interaction.pairs.length ? question.points * hits / interaction.pairs.length : 0 };
   }
   if (interaction?.kind === 'match_table_grid') {
     const submitted = new Set(Array.isArray(value) ? value : [value]);
