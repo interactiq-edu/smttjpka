@@ -18,6 +18,8 @@ export interface Env extends AuthEnvironment {
   PASSWORD_RESET_FROM_EMAIL?: string;
   PASSWORD_RESET_APP_URL?: string;
   AI_GATEWAY_ID?: string;
+  AI_GATEWAY_ACCOUNT_ID?: string;
+  AI_GATEWAY_TOKEN?: string;
   AI_BACKUP_MODEL?: string;
   MEDIA?: R2Bucket;
   AI?: { run(model: string, input: Record<string, unknown>, options?: { gateway?: { id: string; skipCache?: boolean; collectLog?: boolean; metadata?: Record<string,string> } }): Promise<unknown> };
@@ -206,7 +208,7 @@ export const app = {
     const questionRepository = new QuestionRepository(env.DB);
     const resources = new ResourceService(resourceRepository, questionRepository);
     const questions = new QuestionService(resourceRepository, questionRepository);
-    const attempts = new AttemptService(env.DB, env.AI, env.MEDIA, env.AI_GATEWAY_ID ?? 'default', env.AI_BACKUP_MODEL ?? 'google-ai-studio/gemini-3.8-flash');
+    const attempts = new AttemptService(env.DB, env.AI, env.MEDIA, env.AI_GATEWAY_ID ?? 'default', env.AI_BACKUP_MODEL ?? 'gemini-3.8-flash', env.AI_GATEWAY_ACCOUNT_ID, env.AI_GATEWAY_TOKEN);
     try {
       if (request.method === 'GET' && url.pathname === '/api/v1/storage/usage') {
         const session = await authenticatedSession(request, env, auth);

@@ -11,9 +11,11 @@ PBKDF2_ITERATIONS = "100000"
 SESSION_TTL_SECONDS = "28800"
 DEFAULT_TENANT_SLUG = "interactiq-intan"
 AI_GATEWAY_ID = "default"
+AI_GATEWAY_ACCOUNT_ID = "869aa848ce161ccf42491773d39a1b8c"
 # Gemini is called through AI Gateway. Store a newly rotated Google AI Studio
-# credential under the gateway's default BYOK alias; never put the key here.
-AI_BACKUP_MODEL = "google-ai-studio/gemini-3.8-flash"
+# credential under the gateway's default BYOK alias and set AI_GATEWAY_TOKEN as
+# a Worker secret; never put either credential here.
+AI_BACKUP_MODEL = "gemini-3.8-flash"
 
 [[d1_databases]]
 binding = "DB"

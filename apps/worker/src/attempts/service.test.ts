@@ -95,11 +95,12 @@ describe('human-readable review answers', () => {
 describe('AI preview marking', () => {
   it('uses AI Gateway retries before falling back to Gemini', async () => {
     const statement:D1PreparedStatement={bind:()=>statement,first:async()=>null,all:async<T,>()=>({results:[{id:'question-1',type:'OPEN_ENDED',promptJson:JSON.stringify({type:'doc',content:[]}),configurationJson:JSON.stringify({options:[],acceptedAnswers:['gravity'],interaction:null}),points:2,timeLimitSeconds:null,position:0}] as T[],success:true,meta:{}}),run:async()=>({results:[],success:true,meta:{}})};
-    const db:D1Database={prepare:()=>statement,batch:async()=>[]};const models:string[]=[];const gateways:string[]=[];
-    const service=new AttemptService(db,{run:async(model,_input,options)=>{models.push(model);gateways.push(options?.gateway?.id??'');if(model.startsWith('@cf/'))throw new Error('quota exceeded');return{choices:[{message:{content:'{"points":2,"feedback":"Gemini vision fallback marked this response."}'}}],usage:{prompt_tokens:20,completion_tokens:8}};}},undefined,'interactiq');
+    const db:D1Database={prepare:()=>statement,batch:async()=>[]};const models:string[]=[];const gateways:string[]=[];const backupUrls:string[]=[];
+    const service=new AttemptService(db,{run:async(model,_input,options)=>{models.push(model);gateways.push(options?.gateway?.id??'');throw new Error('quota exceeded');}},undefined,'interactiq','gemini-3.8-flash','account-id','gateway-token',async(input,init)=>{backupUrls.push(String(input));expect((init?.headers as Record<string,string>)['cf-aig-authorization']).toBe('Bearer gateway-token');return new Response(JSON.stringify({candidates:[{content:{parts:[{text:'{"points":2,"feedback":"Gemini vision fallback marked this response."}'}]}}],usageMetadata:{promptTokenCount:20,candidatesTokenCount:8}}),{status:200,headers:{'content-type':'application/json'}});});
     const result=await service.previewOpenEnded('tenant-1','resource-1','question-1',{value:'Gravity pulls objects down.'});
-    expect(models).toEqual(['@cf/meta/llama-3.1-8b-instruct-fast','@cf/meta/llama-3.1-8b-instruct-fast','@cf/meta/llama-3.1-8b-instruct-fast','google-ai-studio/gemini-3.8-flash']);
-    expect(gateways).toEqual(['interactiq','interactiq','interactiq','interactiq']);
+    expect(models).toEqual(['@cf/meta/llama-3.1-8b-instruct-fast','@cf/meta/llama-3.1-8b-instruct-fast','@cf/meta/llama-3.1-8b-instruct-fast']);
+    expect(gateways).toEqual(['interactiq','interactiq','interactiq']);
+    expect(backupUrls[0]).toContain('/interactiq/google-ai-studio/v1beta/models/gemini-3.8-flash:generateContent');
     expect(result.points).toBe(2);
   });
 
