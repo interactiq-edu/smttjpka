@@ -101,7 +101,7 @@ export const gradeAnswer = gradeQuestionAnswer;
 export class AttemptService {
   private readonly resources: ResourceRepository;
   private readonly questions: QuestionRepository;
-  constructor(private readonly db: D1Database, private readonly ai?: AiBinding, private readonly media?: MediaBinding, private readonly gatewayId='default', private readonly backupModel='gemini-3.8-flash', private readonly gatewayAccountId?:string, private readonly gatewayToken?:string, private readonly gatewayFetch:GatewayFetch=fetch) {
+  constructor(private readonly db: D1Database, private readonly ai?: AiBinding, private readonly media?: MediaBinding, private readonly gatewayId='default', private readonly backupModel='gemini-3.8-flash', private readonly gatewayAccountId?:string, private readonly gatewayToken?:string, private readonly gatewayFetch:GatewayFetch=(input,init)=>fetch(input,init)) {
     this.resources = new ResourceRepository(db);
     this.questions = new QuestionRepository(db);
   }
