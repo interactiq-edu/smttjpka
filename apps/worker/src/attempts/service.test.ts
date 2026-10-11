@@ -158,6 +158,25 @@ describe('AI preview marking', () => {
 });
 
 describe('resource-scoped student attempts', () => {
+  it('refreshes a submitted AI result from pending to the awarded mark', async () => {
+    let graded=false;
+    const db:D1Database={
+      prepare:(query)=>{
+        const statement:D1PreparedStatement={
+          bind:()=>statement,
+          first:async<T,>()=>query.includes('FROM attempts a JOIN learning_resources r')?({id:'attempt-ai',resourceId:'resource-ai',status:'COMPLETED',score:graded?4:0,maxScore:4,submittedAt:'2026-10-12 01:00:00',studentFullName:'Aisyah',studentClassName:'5 PKA 2',resultReleasePolicy:'IMMEDIATE_PER_QUESTION'} as T):null,
+          all:async<T,>()=>({results:(query.includes('FROM quiz_questions')?[{id:'question-ai',type:'MATH_RESPONSE',promptJson:JSON.stringify({type:'doc',content:[]}),configurationJson:JSON.stringify({options:[],acceptedAnswers:[],interaction:null}),points:4,timeLimitSeconds:null,position:0}]:query.includes('FROM attempt_answers')?[{questionId:'question-ai',isCorrect:null,awardedPoints:graded?4:null,aiMarkingStatus:graded?'GRADED':'PENDING'}]:[]) as T[],success:true,meta:{}}),
+          run:async()=>({results:[],success:true,meta:{}}),
+        };return statement;
+      },
+      batch:async()=>[],
+    };
+    const service=new AttemptService(db);
+    await expect(service.result('tenant-one','student-one','attempt-ai')).resolves.toMatchObject({score:0,maxScore:0,pendingAiCount:1,answerResults:[{points:null,aiMarkingStatus:'PENDING'}]});
+    graded=true;
+    await expect(service.result('tenant-one','student-one','attempt-ai')).resolves.toMatchObject({score:4,maxScore:4,pendingAiCount:0,answerResults:[{points:4,aiMarkingStatus:'GRADED'}]});
+  });
+
   it('restores the in-progress attempt and student identity after a browser refresh', async () => {
     let inserted=false;
     const db: D1Database = {

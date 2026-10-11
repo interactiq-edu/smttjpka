@@ -211,6 +211,26 @@ export class AttemptService {
       ...(release==='DETAILED_AFTER_SUBMISSION'||release==='IMMEDIATE_PER_QUESTION'?{answerResults:graded.map(({answer,result,aiMarkingStatus})=>({questionId:answer.questionId,correct:result.correct,points:result.points,maxPoints:questionMap.get(answer.questionId)!.points,aiMarkingStatus,correctAnswer:correctAnswer(questionMap.get(answer.questionId)!)}))}:{}) };
   }
 
+  async result(tenantId:string,userId:string,attemptId:string):Promise<AttemptResult>{
+    const attempt=await this.db.prepare(`SELECT a.id, a.resource_id AS resourceId, a.status, a.score, a.max_score AS maxScore,
+      a.submitted_at AS submittedAt, a.student_full_name AS studentFullName, a.student_class_name AS studentClassName,
+      r.result_release_policy AS resultReleasePolicy FROM attempts a JOIN learning_resources r ON r.id=a.resource_id
+      WHERE a.id=? AND a.tenant_id=? AND a.user_id=? AND a.kicked_at IS NULL LIMIT 1`).bind(attemptId,tenantId,userId)
+      .first<{id:string;resourceId:string;status:'IN_PROGRESS'|'COMPLETED';score:number|null;maxScore:number|null;submittedAt:string|null;studentFullName:string|null;studentClassName:string|null;resultReleasePolicy:string}>();
+    if(!attempt||attempt.status!=='COMPLETED')throw new AuthError(404,'VALIDATION_ERROR','The submitted attempt does not exist.');
+    const questions=await this.questions.list(tenantId,attempt.resourceId);const questionMap=new Map(questions.map((question)=>[question.id,question]));
+    const rows=await this.db.prepare(`SELECT question_id AS questionId, is_correct AS isCorrect, awarded_points AS awardedPoints,
+      ai_marking_status AS aiMarkingStatus FROM attempt_answers WHERE attempt_id=? ORDER BY rowid`).bind(attemptId)
+      .all<{questionId:string;isCorrect:number|null;awardedPoints:number|null;aiMarkingStatus:AiMarkingStatus}>();
+    const pendingAiCount=rows.results.filter((row)=>row.aiMarkingStatus==='PENDING').length;
+    const pendingMaximum=rows.results.reduce((sum,row)=>sum+(row.aiMarkingStatus==='PENDING'?(questionMap.get(row.questionId)?.points??0):0),0);
+    const fullMaximum=Number(attempt.maxScore??0);const gradedMaxScore=Math.max(0,fullMaximum-pendingMaximum);
+    const hidden=attempt.resultReleasePolicy==='TEACHER_REVIEW';const detailed=attempt.resultReleasePolicy==='DETAILED_AFTER_SUBMISSION'||attempt.resultReleasePolicy==='IMMEDIATE_PER_QUESTION';
+    return {id:attempt.id,resourceId:attempt.resourceId,status:'COMPLETED',score:hidden?null:Number(attempt.score??0),maxScore:hidden?null:pendingAiCount?gradedMaxScore:fullMaximum,
+      gradedMaxScore:hidden?undefined:gradedMaxScore,pendingAiCount,submittedAt:attempt.submittedAt,studentFullName:attempt.studentFullName,studentClassName:attempt.studentClassName,
+      ...(detailed?{answerResults:rows.results.map((row)=>{const question=questionMap.get(row.questionId);return {questionId:row.questionId,correct:row.isCorrect===null?null:Boolean(row.isCorrect),points:row.aiMarkingStatus==='PENDING'?null:Number(row.awardedPoints??0),maxPoints:question?.points??0,aiMarkingStatus:row.aiMarkingStatus,correctAnswer:question?correctAnswer(question):null};})}:{})};
+  }
+
   async markPendingAi(tenantId:string,attemptId:string):Promise<void>{
     const attempt=await this.db.prepare(`SELECT resource_id AS resourceId FROM attempts WHERE id=? AND tenant_id=? AND status='COMPLETED' LIMIT 1`).bind(attemptId,tenantId).first<{resourceId:string}>();
     if(!attempt)return;

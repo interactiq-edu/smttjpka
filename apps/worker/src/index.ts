@@ -651,6 +651,11 @@ export const app = {
         if(data.pendingAiCount){const marking=attempts.markPendingAi(session.data.tenant.id,data.id).catch((error)=>console.error('Background AI marking failed',{attemptId:data.id,name:error instanceof Error?error.name:'UnknownError',message:error instanceof Error?error.message:String(error)}));if(context)context.waitUntil(marking);else await marking;}
         return json(request, env, { success: true, data });
       }
+      const attemptResultRoute=/^\/api\/v1\/attempts\/([0-9a-f-]{36})\/result$/i.exec(url.pathname);
+      if(request.method==='GET'&&attemptResultRoute){
+        const session=await authenticatedSession(request,env,auth);
+        return json(request,env,{success:true,data:await attempts.result(session.data.tenant.id,session.data.user.id,attemptResultRoute[1]!)});
+      }
       const assignmentSubmitRoute = /^\/api\/v1\/attempts\/([0-9a-f-]{36})\/assignment$/i.exec(url.pathname);
       if (request.method === 'POST' && assignmentSubmitRoute) {
         if (!env.MEDIA) throw new AuthError(503, 'CONFIGURATION_ERROR', 'File storage is not configured.');
