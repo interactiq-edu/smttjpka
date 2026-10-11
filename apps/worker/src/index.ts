@@ -647,7 +647,9 @@ export const app = {
         const csrfToken = request.headers.get('x-csrf-token');
         if (!csrfToken) throw new AuthError(403, 'FORBIDDEN', 'CSRF validation failed.');
         await auth.requireCsrf(session.token, csrfToken);
-        return json(request, env, { success: true, data: await attempts.submit(session.data.tenant.id, session.data.user.id, submitAttemptRoute[1]!, await parseJson(request)) });
+        const data=await attempts.submit(session.data.tenant.id, session.data.user.id, submitAttemptRoute[1]!, await parseJson(request));
+        if(data.pendingAiCount){const marking=attempts.markPendingAi(session.data.tenant.id,data.id).catch((error)=>console.error('Background AI marking failed',{attemptId:data.id,name:error instanceof Error?error.name:'UnknownError',message:error instanceof Error?error.message:String(error)}));if(context)context.waitUntil(marking);else await marking;}
+        return json(request, env, { success: true, data });
       }
       const assignmentSubmitRoute = /^\/api\/v1\/attempts\/([0-9a-f-]{36})\/assignment$/i.exec(url.pathname);
       if (request.method === 'POST' && assignmentSubmitRoute) {
