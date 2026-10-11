@@ -173,6 +173,10 @@ export class AttemptService {
       (attempt_id, question_id, answer_json, is_correct, awarded_points, ai_suggested_points, ai_feedback) VALUES (?, ?, ?, ?, ?, ?, ?)`)
       .bind(attemptId, item.answer.questionId, JSON.stringify(item.answer.value), item.result.correct === null ? null : Number(item.result.correct),
         item.result.points, item.ai?.points ?? null, item.ai?.feedback ?? null));
+    if (resource?.type === 'QUIZ' && resource.replacePreviousAttempts) {
+      statements.unshift(this.db.prepare(`DELETE FROM attempts WHERE tenant_id = ? AND resource_id = ? AND user_id = ?
+        AND status = 'COMPLETED' AND id <> ?`).bind(tenantId, attempt.resourceId, userId, attemptId));
+    }
     statements.push(this.db.prepare(`UPDATE attempts SET status = 'COMPLETED', score = ?, max_score = ?, student_full_name = ?, student_class_name = ?,
       submitted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ? AND user_id = ? AND status = 'IN_PROGRESS'`)
       .bind(score, maxScore, submission.fullName, submission.className, attemptId, tenantId, userId));

@@ -24,13 +24,15 @@ const parseCreateInput = (value: unknown): CreateLearningResourceInput => {
   return { title, type: body.type as ResourceType, attemptPolicy, ...(assignedClassName ? { assignedClassName } : {}), ...(typeof description === 'string' && description.trim() ? { description: description.trim() } : {}) };
 };
 
-const parseAccessSettings = (value: unknown): { attemptPolicy: AttemptPolicy; resultReleasePolicy: ResultReleasePolicy; accessStartsAt: string | null } => {
+const parseAccessSettings = (value: unknown): { attemptPolicy: AttemptPolicy; resultReleasePolicy: ResultReleasePolicy; accessStartsAt: string | null; replacePreviousAttempts: boolean; musicTrackId: string | null } => {
   const body = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
   const attemptPolicy = typeof body.attemptPolicy === 'string' && attemptPolicies.has(body.attemptPolicy as AttemptPolicy) ? body.attemptPolicy as AttemptPolicy : 'MULTIPLE';
   const resultReleasePolicy = typeof body.resultReleasePolicy === 'string' && resultReleasePolicies.has(body.resultReleasePolicy as ResultReleasePolicy) ? body.resultReleasePolicy as ResultReleasePolicy : 'DETAILED_AFTER_SUBMISSION';
   const accessStartsAt = typeof body.accessStartsAt === 'string' && body.accessStartsAt.trim() ? body.accessStartsAt.trim() : null;
+  const replacePreviousAttempts = body.replacePreviousAttempts === true;
+  const musicTrackId = typeof body.musicTrackId === 'string' && /^[0-9a-f-]{36}$/i.test(body.musicTrackId) ? body.musicTrackId : null;
   if (accessStartsAt && Number.isNaN(Date.parse(accessStartsAt))) throw new AuthError(400, 'VALIDATION_ERROR', 'Enter a valid access date and time.');
-  return { attemptPolicy, resultReleasePolicy, accessStartsAt: accessStartsAt ? new Date(accessStartsAt).toISOString() : null };
+  return { attemptPolicy, resultReleasePolicy, accessStartsAt: accessStartsAt ? new Date(accessStartsAt).toISOString() : null, replacePreviousAttempts, musicTrackId };
 };
 
 const isSafeHref = (value: string): boolean => /^https?:\/\//i.test(value);
@@ -141,8 +143,13 @@ export class ResourceService {
 
   async publish(tenantId: string, resourceId: string, body: unknown): Promise<PublishedResource> {
     const settings = parseAccessSettings(body);
+    const existing = await this.resources.findById(tenantId, resourceId);
+    if (!existing) throw new AuthError(404, 'VALIDATION_ERROR', 'The requested resource does not exist.');
+    const musicTrackId = existing.type === 'QUIZ' ? settings.musicTrackId : null;
+    if (musicTrackId && !await this.resources.findMusicTrack(tenantId, musicTrackId)) throw new AuthError(400, 'VALIDATION_ERROR', 'Select a music track from your Quiz music library.');
+    const replacePreviousAttempts = existing.type === 'QUIZ' && settings.attemptPolicy === 'MULTIPLE' && settings.replacePreviousAttempts;
     const shareCode = crypto.randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase();
-    const resource = await this.resources.publish(tenantId, resourceId, shareCode, settings.attemptPolicy, settings.resultReleasePolicy, settings.accessStartsAt);
+    const resource = await this.resources.publish(tenantId, resourceId, shareCode, settings.attemptPolicy, settings.resultReleasePolicy, settings.accessStartsAt, replacePreviousAttempts, musicTrackId);
     if (!resource || !resource.shareCode) throw new AuthError(404, 'VALIDATION_ERROR', 'The requested resource does not exist.');
     return { resource, shareCode: resource.shareCode };
   }

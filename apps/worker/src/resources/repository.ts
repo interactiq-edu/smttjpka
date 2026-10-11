@@ -1,4 +1,4 @@
-import type { AttemptPolicy, DashboardOverview, Flashcard, LearningResourceDetail, LearningResourceSummary, LiveResourceState, LiveWhiteboardStroke, QuizTheme, ResourceFolder, ResourceStatus, ResourceType, ResourceVisibility, ResultReleasePolicy, RichTextDocument, TenantThemeSettings } from '@interactiq/contracts';
+import type { AttemptPolicy, DashboardOverview, Flashcard, LearningResourceDetail, LearningResourceSummary, LiveResourceState, LiveWhiteboardStroke, QuizMusicTrack, QuizTheme, ResourceFolder, ResourceStatus, ResourceType, ResourceVisibility, ResultReleasePolicy, RichTextDocument, TenantThemeSettings } from '@interactiq/contracts';
 import type { D1Database } from '../db/types';
 
 interface ResourceRow {
@@ -15,6 +15,8 @@ interface ResourceRow {
   externalUrl: string | null;
   attemptPolicy: AttemptPolicy;
   resultReleasePolicy: ResultReleasePolicy;
+  replacePreviousAttempts: number | boolean;
+  musicTrackId: string | null;
   accessStartsAt: string | null;
   assignedClassName: string | null;
   submissionDueAt: string | null;
@@ -27,9 +29,12 @@ interface ResourceRow {
 const resourceSelect = `id, title, description, resource_type AS type, status, visibility,
   share_code AS shareCode, published_at AS publishedAt, theme_id AS themeId, asset_url AS assetUrl,
   external_url AS externalUrl, attempt_policy AS attemptPolicy, result_release_policy AS resultReleasePolicy, access_starts_at AS accessStartsAt,
+  replace_previous_attempts AS replacePreviousAttempts, music_track_id AS musicTrackId,
   assigned_class_name AS assignedClassName, submission_due_at AS submissionDueAt,
   assignment_max_score AS assignmentMaxScore, folder_id AS folderId,
   created_at AS createdAt, updated_at AS updatedAt`;
+
+const resourceSummary = (row: ResourceRow): LearningResourceSummary => ({ ...row, replacePreviousAttempts: Boolean(row.replacePreviousAttempts) });
 
 export class ResourceRepository {
   constructor(private readonly db: D1Database) {}
@@ -39,14 +44,15 @@ export class ResourceRepository {
       .prepare(`SELECT ${resourceSelect} FROM learning_resources WHERE tenant_id = ? AND resource_type <> 'PASSAGE' ORDER BY updated_at DESC, id DESC LIMIT 100`)
       .bind(tenantId)
       .all<ResourceRow>();
-    return result.results;
+    return result.results.map(resourceSummary);
   }
 
   async findById(tenantId: string, resourceId: string): Promise<LearningResourceSummary | null> {
-    return this.db
+    const row = await this.db
       .prepare(`SELECT ${resourceSelect} FROM learning_resources WHERE tenant_id = ? AND id = ? LIMIT 1`)
       .bind(tenantId, resourceId)
-      .first<LearningResourceSummary>();
+      .first<ResourceRow>();
+    return row ? resourceSummary(row) : null;
   }
 
   async findDetailById(tenantId: string, resourceId: string): Promise<LearningResourceDetail | null> {
@@ -56,7 +62,7 @@ export class ResourceRepository {
       .first<ResourceRow & { contentJson: string }>();
     if (!row) return null;
     const content = JSON.parse(row.contentJson) as RichTextDocument;
-    return { ...row, content: content.type === 'doc' && Array.isArray(content.content) ? content : { type: 'doc', content: [] } };
+    return { ...resourceSummary(row), content: content.type === 'doc' && Array.isArray(content.content) ? content : { type: 'doc', content: [] }, musicPlaylist: row.type === 'QUIZ' && row.musicTrackId ? await this.listMusicTracks(tenantId, row.musicTrackId) : [] };
   }
 
   async findPublishedByShareCode(tenantId: string, shareCode: string): Promise<LearningResourceDetail | null> {
@@ -67,13 +73,14 @@ export class ResourceRepository {
       .first<ResourceRow & { contentJson: string }>();
     if (!row) return null;
     const content = JSON.parse(row.contentJson) as RichTextDocument;
-    return { ...row, content: content.type === 'doc' && Array.isArray(content.content) ? content : { type: 'doc', content: [] } };
+    return { ...resourceSummary(row), content: content.type === 'doc' && Array.isArray(content.content) ? content : { type: 'doc', content: [] }, musicPlaylist: row.type === 'QUIZ' && row.musicTrackId ? await this.listMusicTracks(tenantId, row.musicTrackId) : [] };
   }
 
   async findPublishedContextByShareCode(shareCode: string): Promise<(LearningResourceDetail & { tenantId: string; tenantSlug: string; tenantName: string }) | null> {
     const row = await this.db.prepare(`SELECT r.id, r.title, r.description, r.resource_type AS type, r.status, r.visibility,
       r.share_code AS shareCode, r.published_at AS publishedAt, r.theme_id AS themeId, r.asset_url AS assetUrl, r.external_url AS externalUrl,
       r.attempt_policy AS attemptPolicy, r.result_release_policy AS resultReleasePolicy, r.access_starts_at AS accessStartsAt,
+      r.replace_previous_attempts AS replacePreviousAttempts, r.music_track_id AS musicTrackId,
       r.assigned_class_name AS assignedClassName, r.submission_due_at AS submissionDueAt,
       r.assignment_max_score AS assignmentMaxScore, r.folder_id AS folderId,
       r.created_at AS createdAt, r.updated_at AS updatedAt, r.content_json AS contentJson,
@@ -83,7 +90,7 @@ export class ResourceRepository {
       .bind(shareCode).first<ResourceRow & { contentJson: string; tenantId: string; tenantSlug: string; tenantName: string }>();
     if (!row) return null;
     const content = JSON.parse(row.contentJson) as RichTextDocument;
-    return { ...row, content: content.type === 'doc' && Array.isArray(content.content) ? content : { type: 'doc', content: [] } };
+    return { ...resourceSummary(row), content: content.type === 'doc' && Array.isArray(content.content) ? content : { type: 'doc', content: [] }, musicPlaylist: row.type === 'QUIZ' && row.musicTrackId ? await this.listMusicTracks(row.tenantId, row.musicTrackId) : [], tenantId: row.tenantId, tenantSlug: row.tenantSlug, tenantName: row.tenantName };
   }
 
   async create(input: {
@@ -212,12 +219,45 @@ export class ResourceRepository {
     return this.findById(tenantId, resourceId);
   }
 
-  async publish(tenantId: string, resourceId: string, shareCode: string, attemptPolicy: AttemptPolicy, resultReleasePolicy: ResultReleasePolicy, accessStartsAt: string | null): Promise<LearningResourceSummary | null> {
+  async publish(tenantId: string, resourceId: string, shareCode: string, attemptPolicy: AttemptPolicy, resultReleasePolicy: ResultReleasePolicy, accessStartsAt: string | null, replacePreviousAttempts: boolean, musicTrackId: string | null): Promise<LearningResourceSummary | null> {
     await this.db.prepare(`UPDATE learning_resources
       SET status = 'PUBLISHED', visibility = 'TENANT', share_code = COALESCE(share_code, ?),
-        published_at = COALESCE(published_at, CURRENT_TIMESTAMP), attempt_policy = ?, result_release_policy = ?, access_starts_at = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE tenant_id = ? AND id = ?`).bind(shareCode, attemptPolicy, resultReleasePolicy, accessStartsAt, tenantId, resourceId).run();
+        published_at = COALESCE(published_at, CURRENT_TIMESTAMP), attempt_policy = ?, result_release_policy = ?, access_starts_at = ?,
+        replace_previous_attempts = ?, music_track_id = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE tenant_id = ? AND id = ?`).bind(shareCode, attemptPolicy, resultReleasePolicy, accessStartsAt, Number(replacePreviousAttempts), musicTrackId, tenantId, resourceId).run();
     return this.findById(tenantId, resourceId);
+  }
+
+  async listMusicTracks(tenantId: string, selectedId: string | null = null): Promise<QuizMusicTrack[]> {
+    const result = await this.db.prepare(`SELECT id, name, object_key AS objectKey, size, content_type AS contentType, created_at AS createdAt
+      FROM quiz_music_tracks WHERE tenant_id = ? ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END, created_at DESC, id DESC`)
+      .bind(tenantId, selectedId).all<QuizMusicTrack & { objectKey: string }>();
+    return result.results.map(({ objectKey, ...track }) => ({ ...track, url: `/api/v1/media/${objectKey}` }));
+  }
+
+  async findMusicTrack(tenantId: string, trackId: string): Promise<(QuizMusicTrack & { objectKey: string }) | null> {
+    const row = await this.db.prepare(`SELECT id, name, object_key AS objectKey, size, content_type AS contentType, created_at AS createdAt
+      FROM quiz_music_tracks WHERE tenant_id = ? AND id = ? LIMIT 1`).bind(tenantId, trackId).first<QuizMusicTrack & { objectKey: string }>();
+    return row ? { ...row, url: `/api/v1/media/${row.objectKey}` } : null;
+  }
+
+  async createMusicTrack(tenantId: string, input: { id: string; name: string; objectKey: string; size: number; contentType: string }): Promise<QuizMusicTrack> {
+    await this.db.prepare(`INSERT INTO quiz_music_tracks (id, tenant_id, name, object_key, size, content_type) VALUES (?, ?, ?, ?, ?, ?)`)
+      .bind(input.id, tenantId, input.name, input.objectKey, input.size, input.contentType).run();
+    const track = await this.findMusicTrack(tenantId, input.id);
+    if (!track) throw new Error('Music upload did not return a record.');
+    const { objectKey: _objectKey, ...publicTrack } = track;
+    return publicTrack;
+  }
+
+  async deleteMusicTrack(tenantId: string, trackId: string): Promise<string | null> {
+    const track = await this.findMusicTrack(tenantId, trackId);
+    if (!track) return null;
+    await this.db.batch([
+      this.db.prepare('UPDATE learning_resources SET music_track_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE tenant_id = ? AND music_track_id = ?').bind(tenantId, trackId),
+      this.db.prepare('DELETE FROM quiz_music_tracks WHERE tenant_id = ? AND id = ?').bind(tenantId, trackId),
+    ]);
+    return track.objectKey;
   }
 
   async unpublish(tenantId: string, resourceId: string): Promise<LearningResourceSummary | null> {

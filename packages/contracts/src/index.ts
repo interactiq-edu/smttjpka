@@ -87,6 +87,15 @@ export type AttemptPolicy = 'ONCE_PER_EMAIL' | 'MULTIPLE';
 export type ResultReleasePolicy = 'DETAILED_AFTER_SUBMISSION' | 'SCORE_ONLY' | 'TEACHER_REVIEW' | 'IMMEDIATE_PER_QUESTION';
 export type AssignmentReviewStatus = 'PENDING' | 'NOT_REVIEWED' | 'REVIEWED';
 
+export interface QuizMusicTrack {
+  id: string;
+  name: string;
+  url: string;
+  size: number;
+  contentType: string;
+  createdAt: string;
+}
+
 export interface LearningResourceSummary {
   id: string;
   title: string;
@@ -101,6 +110,8 @@ export interface LearningResourceSummary {
   externalUrl: string | null;
   attemptPolicy: AttemptPolicy;
   resultReleasePolicy: ResultReleasePolicy;
+  replacePreviousAttempts?: boolean;
+  musicTrackId?: string | null;
   accessStartsAt: string | null;
   assignedClassName: string | null;
   submissionDueAt: string | null;
@@ -137,6 +148,7 @@ export interface RichTextDocument {
 
 export interface LearningResourceDetail extends LearningResourceSummary {
   content: RichTextDocument;
+  musicPlaylist?: QuizMusicTrack[];
 }
 
 export interface CreateLearningResourceInput {

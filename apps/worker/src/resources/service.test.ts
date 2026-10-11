@@ -7,6 +7,20 @@ const repository = () => ({
 }) as unknown as ResourceRepository;
 
 describe('ResourceService rich text validation', () => {
+  it('publishes a Quiz with its selected music and latest-result replacement policy', async () => {
+    const publish = vi.fn().mockResolvedValue({ id:'resource-1', type:'QUIZ', shareCode:'QUIZ1234' });
+    const fake = {
+      findById: vi.fn().mockResolvedValue({ id:'resource-1', type:'QUIZ' }),
+      findMusicTrack: vi.fn().mockResolvedValue({ id:'track-1' }),
+      publish,
+    } as unknown as ResourceRepository;
+    const service = new ResourceService(fake);
+
+    await service.publish('tenant-a','resource-1',{ attemptPolicy:'MULTIPLE', resultReleasePolicy:'IMMEDIATE_PER_QUESTION', replacePreviousAttempts:true, musicTrackId:'11111111-1111-4111-8111-111111111111', accessStartsAt:null });
+
+    expect(publish).toHaveBeenCalledWith('tenant-a','resource-1',expect.any(String),'MULTIPLE','IMMEDIATE_PER_QUESTION',null,true,'11111111-1111-4111-8111-111111111111');
+  });
+
   it('accepts a structured document using an https link', async () => {
     const service = new ResourceService(repository());
     await expect(service.updateContent('tenant-a', 'resource-1', {

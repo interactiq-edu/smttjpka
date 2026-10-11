@@ -112,6 +112,10 @@ const hasTrustedSignature = async (file: File, extension: string): Promise<boole
   if (['doc','xls','ppt','pub','vsd','mdb'].includes(extension)) return beginsWith(bytes,[0xd0,0xcf,0x11,0xe0,0xa1,0xb1,0x1a,0xe1]);
   if (extension === 'rtf') return new TextDecoder().decode(bytes.slice(0,5)) === '{\\rtf';
   if (extension === 'dwg') return /^AC10/.test(new TextDecoder().decode(bytes.slice(0,6)));
+  if (extension === 'mp3') return new TextDecoder().decode(bytes.slice(0,3)) === 'ID3' || (bytes[0] === 0xff && ((bytes[1] ?? 0) & 0xe0) === 0xe0);
+  if (extension === 'wav') return new TextDecoder().decode(bytes.slice(0,4)) === 'RIFF' && new TextDecoder().decode(bytes.slice(8,12)) === 'WAVE';
+  if (extension === 'ogg') return new TextDecoder().decode(bytes.slice(0,4)) === 'OggS';
+  if (extension === 'm4a') return new TextDecoder().decode(bytes.slice(4,8)) === 'ftyp';
   return true;
 };
 
@@ -137,7 +141,7 @@ export const app = {
       const data: HealthData = { service: 'interactiq-api', environment: env.APP_ENV };
       return json(request, env, { success: true, data });
     }
-    const mediaRoute = /^\/api\/v1\/media\/([a-z0-9/_-]+\.(?:png|jpg|jpeg|webp|gif|ppt|pptx|pptm|doc|docx|docm|rtf|xls|xlsx|xlsm|csv|pub|vsd|vsdx|mdb|accdb|one|pdf|dwg))$/i.exec(url.pathname);
+    const mediaRoute = /^\/api\/v1\/media\/([a-z0-9/_-]+\.(?:png|jpg|jpeg|webp|gif|ppt|pptx|pptm|doc|docx|docm|rtf|xls|xlsx|xlsm|csv|pub|vsd|vsdx|mdb|accdb|one|pdf|dwg|mp3|m4a|wav|ogg))$/i.exec(url.pathname);
     if ((request.method === 'GET' || request.method === 'HEAD') && mediaRoute) {
       if (!env.MEDIA) return errorResponse(request, env, 503, 'CONFIGURATION_ERROR', 'Image storage is not configured.');
       const key=mediaRoute[1]!;
@@ -229,6 +233,49 @@ export const app = {
         ]);
         await env.MEDIA.delete(key);
         return json(request,env,{success:true,data:{deleted:true}});
+      }
+      const musicRoute = /^\/api\/v1\/music(?:\/([0-9a-f-]{36}))?$/i.exec(url.pathname);
+      if (musicRoute && ['GET','POST','DELETE'].includes(request.method)) {
+        if (!env.MEDIA) throw new AuthError(503, 'CONFIGURATION_ERROR', 'Music storage is not configured.');
+        const session = await authenticatedSession(request, env, auth);
+        const tenantId = session.data.tenant.id;
+        if (request.method === 'GET') {
+          requirePermission(toTenantContext(session.data), 'resource.read');
+          return json(request, env, { success: true, data: await resourceRepository.listMusicTracks(tenantId) });
+        }
+        const csrfToken = request.headers.get('x-csrf-token');
+        if (!csrfToken) throw new AuthError(403, 'FORBIDDEN', 'CSRF validation failed.');
+        await auth.requireCsrf(session.token, csrfToken);
+        if (request.method === 'DELETE') {
+          requirePermission(toTenantContext(session.data), 'resource.delete');
+          const trackId = musicRoute[1];
+          if (!trackId) throw new AuthError(400, 'VALIDATION_ERROR', 'Select a music track to delete.');
+          const objectKey = await resourceRepository.deleteMusicTrack(tenantId, trackId);
+          if (!objectKey) throw new AuthError(404, 'VALIDATION_ERROR', 'The music track does not exist.');
+          await env.MEDIA.delete(objectKey);
+          publicJoinCache.clear();
+          return json(request, env, { success: true, data: { deleted: true } });
+        }
+        requirePermission(toTenantContext(session.data), 'resource.update');
+        if (!request.headers.get('content-type')?.toLowerCase().startsWith('multipart/form-data')) throw new AuthError(415, 'VALIDATION_ERROR', 'Upload a multipart audio file.');
+        const form = await request.formData();
+        const file = form.get('file');
+        const extension = file instanceof File ? /\.(mp3|m4a|wav|ogg)$/i.exec(file.name)?.[1]?.toLowerCase() : undefined;
+        const contentTypes: Record<string,string> = { mp3:'audio/mpeg', m4a:'audio/mp4', wav:'audio/wav', ogg:'audio/ogg' };
+        if (!(file instanceof File) || !extension || file.size < 1 || file.size > 25_000_000) throw new AuthError(400, 'VALIDATION_ERROR', 'Use an MP3, M4A, WAV, or OGG file smaller than 25 MB.');
+        if (!await hasTrustedSignature(file, extension)) throw new AuthError(400, 'VALIDATION_ERROR', 'The uploaded audio content does not match its file type.');
+        const id = crypto.randomUUID();
+        const key = `tenants/${tenantId}/music/${id}.${extension}`;
+        const contentType = contentTypes[extension]!;
+        await env.MEDIA.put(key, await file.arrayBuffer(), { httpMetadata: { contentType } });
+        try {
+          const name = file.name.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 160) || `Quiz music.${extension}`;
+          const track = await resourceRepository.createMusicTrack(tenantId, { id, name, objectKey: key, size: file.size, contentType });
+          return json(request, env, { success: true, data: track }, { status: 201 });
+        } catch (caught) {
+          await env.MEDIA.delete(key);
+          throw caught;
+        }
       }
       const publicJoinRoute = /^\/api\/v1\/join\/([A-Z0-9]{8})\/info$/i.exec(url.pathname);
       if (request.method === 'GET' && publicJoinRoute) {
