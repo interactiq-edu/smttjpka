@@ -119,7 +119,7 @@ export function RichTextEditor({ value, onChange, onUploadImage, mode = 'full', 
     } catch (error) { setImageError(error instanceof Error ? error.message : 'Unable to upload this image.'); }
   };
   const insertText = (text: string) => { editor.chain().focus().insertContent(text).run(); setPicker(null); };
-  const fontSize = String(editor.getAttributes('textStyle').fontSize ?? '');
+  const fontSize = String(editor.getAttributes('textStyle').fontSize ?? 16);
   const undo = historyOverride?.undo ?? (() => editor.chain().focus().undo().run());
   const redo = historyOverride?.redo ?? (() => editor.chain().focus().redo().run());
 
@@ -127,7 +127,7 @@ export function RichTextEditor({ value, onChange, onUploadImage, mode = 'full', 
     <div className="rich-editor__toolbar" aria-label="Formatting toolbar">
       <button aria-label="Undo" disabled={historyOverride ? !historyOverride.canUndo : !editor.can().undo()} onClick={undo} type="button">↶ Undo</button>
       <button aria-label="Redo" disabled={historyOverride ? !historyOverride.canRedo : !editor.can().redo()} onClick={redo} type="button">↷ Redo</button>
-      <label className="toolbar-font-size" title="Font size"><span className="visually-hidden">Font size</span><select aria-label="Font size" value={fontSize} onChange={(event) => { const size = Number(event.target.value); if (size) editor.chain().focus().setMark('textStyle', { fontSize: size }).run(); else editor.chain().focus().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run(); }}><option value="">Size</option>{officeFontSizes.map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
+      <label className="toolbar-font-size" title="Font size"><span className="visually-hidden">Font size</span><select aria-label="Font size" value={fontSize} onChange={(event) => editor.chain().focus().setMark('textStyle', { fontSize: Number(event.target.value) }).run()}>{officeFontSizes.map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
       <span className="toolbar-divider" />
       <button className={editor.isActive('bold') ? 'is-active' : ''} onClick={command(() => editor.chain().toggleBold().run())} type="button"><strong>B</strong></button>
       <button className={editor.isActive('italic') ? 'is-active' : ''} onClick={command(() => editor.chain().toggleItalic().run())} type="button"><em>I</em></button>

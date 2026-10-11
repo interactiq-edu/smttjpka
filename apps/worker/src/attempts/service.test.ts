@@ -111,6 +111,37 @@ describe('AI preview marking', () => {
     expect(JSON.stringify(aiInput)).toContain('self-government');
     expect(JSON.stringify(aiInput)).toContain('Untrusted student response');
   });
+
+  it('sends teacher reference images and student handwriting together for Math Response marking', async () => {
+    const configuration = {
+      options: [], acceptedAnswers: [], interaction: { kind:'math_response', calculator:false, handwriting:true, parts:[
+        { id:'formula', label:'Formula', enabled:true, marks:1, scheme:'', schemeDocument:{ type:'doc', content:[{ type:'image', attrs:{ src:'https://example.com/formula-reference.png', alt:'Formula reference' } }] } },
+        { id:'method', label:'Method calculation', enabled:true, marks:2, scheme:'Use the correct substitution', schemeDocument:{ type:'doc', content:[{ type:'paragraph', content:[{ type:'text', text:'Use the correct substitution' }] }] } },
+        { id:'answer', label:'Final answer', enabled:true, marks:1, scheme:'10 N', schemeDocument:{ type:'doc', content:[{ type:'paragraph', content:[{ type:'text', text:'10 N' }] }] } },
+      ] },
+    };
+    const statement: D1PreparedStatement = {
+      bind: () => statement,
+      first: async () => null,
+      all: async <T,>() => ({ results: [{
+        id:'question-math', type:'MATH_RESPONSE', promptJson:JSON.stringify({ type:'doc', content:[{ type:'paragraph', content:[{ type:'text', text:'Calculate the force.' }] }] }),
+        configurationJson:JSON.stringify(configuration), points:4, timeLimitSeconds:null, position:0,
+      }] as T[], success:true, meta:{} }),
+      run: async () => { throw new Error('Preview grading must not write to D1.'); },
+    };
+    const db:D1Database={prepare:()=>statement,batch:async()=>{throw new Error('Preview grading must not batch writes.');}};
+    let aiInput:Record<string,unknown>|null=null;
+    const service=new AttemptService(db,{run:async (_model,input)=>{aiInput=input;return{response:{points:4,feedback:'All sections match the reference.'}};}});
+    const handwriting='data:image/png;base64,c3R1ZGVudC1oYW5kd3JpdGluZw==';
+    const value=JSON.stringify({version:2,parts:{formula:{text:'',pages:[handwriting]},method:{text:'',pages:[]},answer:{text:'',pages:[]}}});
+    const result=await service.previewOpenEnded('tenant-1','resource-1','question-math',{value});
+    const serialized=JSON.stringify(aiInput);
+    expect(result.points).toBe(4);
+    expect(serialized).toContain('Teacher reference image for Formula');
+    expect(serialized).toContain('https://example.com/formula-reference.png');
+    expect(serialized).toContain('Student handwritten Formula page');
+    expect(serialized).toContain(handwriting);
+  });
 });
 
 describe('resource-scoped student attempts', () => {
