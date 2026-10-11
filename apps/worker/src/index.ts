@@ -234,7 +234,7 @@ export const app = {
       }
       if(request.method==='POST'&&url.pathname==='/api/v1/ai/test-backup'){
         const session=await authenticatedSession(request,env,auth);requirePermission(toTenantContext(session.data),'resource.delete');requireAllowedBrowserOrigin(request,env);
-        try{return json(request,env,{success:true,data:await attempts.testGeminiBackup(session.data.tenant.id)});}catch{return errorResponse(request,env,503,'CONFIGURATION_ERROR','Gemini backup connection failed. Check the AI Gateway token, Google AI Studio key, and AI Gateway logs.');}
+        try{return json(request,env,{success:true,data:await attempts.testGeminiBackup(session.data.tenant.id)});}catch(caught){const detail=caught instanceof Error?caught.message:'Unknown Gemini error';console.warn('Gemini backup diagnostic failed',{detail});return errorResponse(request,env,503,'CONFIGURATION_ERROR',`Gemini backup connection failed. ${detail}`);}
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/storage/inventory') {
         const session = await authenticatedSession(request, env, auth); requirePermission(toTenantContext(session.data), 'resource.delete');
