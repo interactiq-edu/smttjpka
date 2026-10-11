@@ -225,7 +225,7 @@ export type QuestionType =
 export type QuestionInteraction =
   | { kind: 'fill_blank'; template: string; blanks: Array<{ id: string; answers: string[]; mode: 'text' | 'dropdown'; options: string[] }>; ignoreAccents: boolean }
   | { kind: 'drag_drop'; template: string; blanks: Array<{ id: string; answer: string }>; distractors: string[] }
-  | { kind: 'math_response'; calculator: boolean; handwriting?: boolean; parts?: Array<{ id: 'formula' | 'method' | 'answer'; label: string; enabled: boolean; marks: number; scheme: string }> }
+  | { kind: 'math_response'; calculator: boolean; handwriting?: boolean; parts?: Array<{ id: 'formula' | 'method' | 'answer'; label: string; enabled: boolean; marks: number; scheme: string; schemeDocument?: RichTextDocument }> }
   | { kind: 'labelling'; imageUrl: string; labels: Array<{ id: string; text: string; x: number; y: number }>; distractors: string[] }
   | { kind: 'hotspot'; imageUrl: string; shape: 'point' | 'rectangle' | 'polygon'; regions: Array<{ id: string; points: Array<{ x: number; y: number }> }> }
   | { kind: 'reorder'; items: string[]; shufflePerStudent?: boolean }

@@ -60,10 +60,29 @@ const parseAnswers = (value: unknown, type: QuestionType): string[] => {
   return keyedTextTypes.has(type) ? [answers.join('\n')] : answers;
 };
 
+const inspectMathRubricDocument = (value: unknown): { valid: boolean; hasImage: boolean } => {
+  if (value === undefined) return { valid:true, hasImage:false };
+  if (!value || typeof value !== 'object' || Array.isArray(value) || (value as Record<string,unknown>).type !== 'doc' || !Array.isArray((value as Record<string,unknown>).content) || JSON.stringify(value).length > 150_000) return { valid:false, hasImage:false };
+  let count=0,hasImage=false;
+  const walk=(nodes:unknown[]):boolean=>nodes.every((entry)=>{
+    if(++count>800||!entry||typeof entry!=='object'||Array.isArray(entry))return false;
+    const node=entry as Record<string,unknown>;if(typeof node.type!=='string'||node.type.length>40)return false;
+    if(node.text!==undefined&&(typeof node.text!=='string'||node.text.length>12000))return false;
+    if(node.type==='image'){
+      if(!node.attrs||typeof node.attrs!=='object'||Array.isArray(node.attrs))return false;
+      const src=(node.attrs as Record<string,unknown>).src;if(typeof src!=='string'||!(/^\/api\/v1\/media\/[A-Za-z0-9%._~!$&'()*+,;=:@/-]+$/i.test(src)||/^https:\/\/[A-Za-z0-9.-]+(?::\d+)?(?:[/?#][^\s]*)?$/i.test(src)))return false;
+      hasImage=true;
+    }
+    if(node.marks!==undefined&&(!Array.isArray(node.marks)||node.marks.length>20))return false;
+    return node.content===undefined||(Array.isArray(node.content)&&walk(node.content));
+  });
+  return { valid:walk((value as Record<string,unknown>).content as unknown[]),hasImage };
+};
+
 const parseInteraction = (value: unknown, type: QuestionType): QuestionInteraction | null => {
   if (!interactiveTypes.has(type)) return null;
   if ((type === 'MATCH' || type === 'MATCH_TABLE_GRID') && (value === undefined || value === null)) return null;
-  if (!value || typeof value !== 'object' || Array.isArray(value) || JSON.stringify(value).length > 150_000) throw new AuthError(400, 'VALIDATION_ERROR', type === 'FILL_IN_THE_BLANKS' ? 'Add at least one accepted answer for the blank.' : 'Complete the interactive question setup before saving.');
+  if (!value || typeof value !== 'object' || Array.isArray(value) || JSON.stringify(value).length > 500_000) throw new AuthError(400, 'VALIDATION_ERROR', type === 'FILL_IN_THE_BLANKS' ? 'Add at least one accepted answer for the blank.' : 'Complete the interactive question setup before saving.');
   const interaction = value as Record<string, unknown>;
   const expected: Partial<Record<QuestionType, QuestionInteraction['kind']>> = {
     FILL_IN_THE_BLANKS: 'fill_blank', DRAG_AND_DROP: 'drag_drop', CATEGORIZE: 'categorize', MATCH: 'match', MATCH_TABLE_GRID: 'match_table_grid', REORDER: 'reorder', MATH_RESPONSE: 'math_response', LABELLING: 'labelling', HOTSPOT: 'hotspot',
@@ -78,7 +97,8 @@ const parseInteraction = (value: unknown, type: QuestionType): QuestionInteracti
     for(const entry of parts){
       if(!entry||typeof entry!=='object'||Array.isArray(entry))throw new AuthError(400,'VALIDATION_ERROR','A Math Response marking section is invalid.');
       const part=entry as Record<string,unknown>;
-      if(!['formula','method','answer'].includes(String(part.id))||ids.has(String(part.id))||typeof part.label!=='string'||!part.label.trim()||typeof part.enabled!=='boolean'||typeof part.marks!=='number'||!Number.isFinite(part.marks)||part.marks<.5||part.marks>100||typeof part.scheme!=='string'||part.scheme.length>4000||(part.enabled&&!part.scheme.trim()))throw new AuthError(400,'VALIDATION_ERROR','Enable at least one Math Response section and provide its marks and AI marking scheme.');
+      const rubric=inspectMathRubricDocument(part.schemeDocument);
+      if(!['formula','method','answer'].includes(String(part.id))||ids.has(String(part.id))||typeof part.label!=='string'||!part.label.trim()||typeof part.enabled!=='boolean'||typeof part.marks!=='number'||!Number.isFinite(part.marks)||part.marks<.5||part.marks>100||typeof part.scheme!=='string'||part.scheme.length>12000||!rubric.valid||(part.enabled&&!part.scheme.trim()&&!rubric.hasImage))throw new AuthError(400,'VALIDATION_ERROR','Enable at least one Math Response section and provide text, an equation, or a reference image for its AI marking scheme.');
       ids.add(String(part.id));if(part.enabled)total+=part.marks;
     }
     if(total<=0)throw new AuthError(400,'VALIDATION_ERROR','Math Response needs at least one enabled marking section.');

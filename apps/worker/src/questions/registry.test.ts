@@ -112,4 +112,15 @@ describe('question registry', () => {
     expect(parseQuestionInput({type:'MATH_RESPONSE',prompt,points:4,interaction})).toMatchObject({type:'MATH_RESPONSE',points:4,acceptedAnswers:[],interaction:{kind:'math_response',handwriting:true}});
     expect(()=>parseQuestionInput({type:'MATH_RESPONSE',prompt,points:5,interaction})).toThrow('total marks');
   });
+
+  it('accepts a Math Response rubric supplied as a reference image', () => {
+    const interaction={kind:'math_response',calculator:false,handwriting:true,parts:[
+      {id:'formula',label:'Formula',enabled:true,marks:1,scheme:'',schemeDocument:{type:'doc',content:[{type:'image',attrs:{src:'/api/v1/media/tenants%2Fteacher%2Fformula.png',alt:'formula scheme'}}]}},
+      {id:'method',label:'Method calculation',enabled:false,marks:2,scheme:''},
+      {id:'answer',label:'Final answer',enabled:false,marks:1,scheme:''},
+    ]};
+    const parsed=parseQuestionInput({type:'MATH_RESPONSE',prompt,points:1,interaction});
+    expect(parsed.interaction?.kind).toBe('math_response');
+    expect(parsed.interaction?.kind==='math_response'&&parsed.interaction.parts?.[0]?.schemeDocument).toMatchObject({type:'doc'});
+  });
 });

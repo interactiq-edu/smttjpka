@@ -204,7 +204,7 @@ export const app = {
     const questionRepository = new QuestionRepository(env.DB);
     const resources = new ResourceService(resourceRepository, questionRepository);
     const questions = new QuestionService(resourceRepository, questionRepository);
-    const attempts = new AttemptService(env.DB, env.AI);
+    const attempts = new AttemptService(env.DB, env.AI, env.MEDIA);
     try {
       if (request.method === 'GET' && url.pathname === '/api/v1/storage/usage') {
         const session = await authenticatedSession(request, env, auth);
