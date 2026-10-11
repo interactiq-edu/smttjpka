@@ -209,6 +209,8 @@ export function App() {
   const [introAudience, setIntroAudience] = useState<IntroAudience | null>(null);
   const [status, setStatus] = useState<ApiStatus>('checking');
   const [session, setSession] = useState<AuthSessionData | null>(null);
+  const hasAdministrativeRole = session?.roles.some((role) => role !== 'STUDENT') ?? false;
+  const isStudentContext = !!session?.roles.includes('STUDENT') && (!!joinCode || !hasAdministrativeRole);
   const [csrf, setCsrf] = useState(() => sessionStorage.getItem('interactiq_csrf') ?? '');
   const [view, setView] = useState<View>('home');
   const [error, setError] = useState('');
@@ -307,25 +309,25 @@ export function App() {
   }, [apiBase, request]);
   useEffect(() => { joined.current = false; setSelected(null); setAttempt(null); setQuestions([]); setFlashcards([]); setError(''); if (joinCode){sessionStorage.setItem('interactiq_last_join_code',joinCode);setView('home');} }, [joinCode]);
   useEffect(() => {
-    if (!joinCode || joinInfoCode!==joinCode || !joinInfo || !session?.roles.includes('STUDENT') || session.tenant.slug===joinInfo.tenantSlug) return;
+    if (!joinCode || joinInfoCode!==joinCode || !joinInfo || !isStudentContext || !session || session.tenant.slug===joinInfo.tenantSlug) return;
     // A student session is tenant-scoped. A link from another tenant must ask
     // Google to establish the correct tenant session instead of hanging.
     sessionStorage.removeItem('interactiq_csrf'); sessionStorage.removeItem('interactiq_session'); setCsrf(''); setSession(null); joined.current=false;
-  }, [joinCode, joinInfo, joinInfoCode, session]);
+  }, [joinCode, joinInfo, joinInfoCode, isStudentContext, session]);
   useEffect(() => {
-    if (!session || session.roles.includes('STUDENT')) return;
+    if (!session || isStudentContext) return;
     const canManageTenant = session.roles.some((role) => role === 'SUPER_ADMIN' || role === 'TENANT_ADMIN');
     void Promise.all([request<LearningResourceSummary[]>('/api/v1/resources'), request<ResourceFolder[]>('/api/v1/resource-folders'), request<DashboardOverview>('/api/v1/dashboard'), request<ResourceReport[]>('/api/v1/reports'), request<StorageUsage>('/api/v1/storage/usage'), request<QuizMusicTrack[]>('/api/v1/music'), canManageTenant ? request<TenantThemeSettings>('/api/v1/settings/theme') : Promise.resolve({ defaultTheme: 'AURORA' as QuizTheme })])
       .then(([resourceData, folderData, dashboardData, reportData, usage, tracks, settings]) => { setResources(resourceData); setFolders(folderData); setDashboard(dashboardData); setReports(reportData); setStorageUsage(usage); setMusicTracks(tracks); setThemeSettings(settings); })
       .catch((caught) => setError(caught instanceof Error ? caught.message : 'Unable to load workspace.'));
-  }, [session]);
+  }, [session, isStudentContext]);
   useEffect(() => {
-    if (!session || session.roles.includes('STUDENT') || view !== 'home') return;
+    if (!session || isStudentContext || view !== 'home') return;
     const refresh = () => { if (document.visibilityState === 'visible') void request<DashboardOverview>('/api/v1/dashboard').then(setDashboard).catch(() => undefined); };
     refresh(); const timer=window.setInterval(refresh,10000); return ()=>window.clearInterval(timer);
-  }, [session, view, request]);
+  }, [session, isStudentContext, view, request]);
   useEffect(() => {
-    if (!session?.roles.includes('STUDENT') || !csrf || !joinCode || !joinInfo || joinInfoCode!==joinCode || session.tenant.slug!==joinInfo.tenantSlug || joined.current || (joinInfo.accessStartsAt && Date.parse(joinInfo.accessStartsAt) > now)) return;
+    if (!isStudentContext || !session || !csrf || !joinCode || !joinInfo || joinInfoCode!==joinCode || session.tenant.slug!==joinInfo.tenantSlug || joined.current || (joinInfo.accessStartsAt && Date.parse(joinInfo.accessStartsAt) > now)) return;
     let active=true; joined.current = true;
     const controller=new AbortController(); const timeout=window.setTimeout(()=>controller.abort(),20000);
     void (async () => {
@@ -344,7 +346,7 @@ export function App() {
       finally { window.clearTimeout(timeout); }
     })();
     return ()=>{active=false;window.clearTimeout(timeout);controller.abort();};
-  }, [session, csrf, joinCode, joinInfo, joinInfoCode, now, request, navigateView]);
+  }, [session, isStudentContext, csrf, joinCode, joinInfo, joinInfoCode, now, request, navigateView]);
 
   const adminLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setBusy('login'); setError(''); const form = new FormData(event.currentTarget);
@@ -395,9 +397,9 @@ export function App() {
   };
   const signOut = () => setIntroAudience('SIGNOUT');
   useEffect(() => {
-    if (!session?.roles.includes('STUDENT') || joinCode) return;
+    if (!session?.roles.includes('STUDENT') || hasAdministrativeRole || joinCode) return;
     void finishSignOut();
-  }, [session, joinCode]);
+  }, [session, hasAdministrativeRole, joinCode]);
   const refreshReports = async () => { setBusy('reports');setError(''); try { const [reportData,usage]=await Promise.all([request<ResourceReport[]>('/api/v1/reports'),request<StorageUsage>('/api/v1/storage/usage')]);setReports(reportData);setStorageUsage(usage);setError(''); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to load reports.'); } finally { setBusy(''); } };
   const loadReports = async () => { navigateView('reports'); await refreshReports(); };
   const openEditor = async (id: string) => { setBusy('editor'); setError(''); try { const detail = await request<LearningResourceDetail>(`/api/v1/resources/${id}`); setSelected(detail);
@@ -485,10 +487,10 @@ export function App() {
   if (!session) return <LoginScreen adminLogin={adminLogin} authNotice={authNotice} busy={busy} error={error} forgotPassword={forgotPasswordRoute} googleLogin={googleLogin} joinCode={joinCode} joinInfo={joinInfo} onBack={() => openAuthRoute('')} onForgot={() => openAuthRoute('forgot-password')} onRequestReset={requestPasswordReset} status={status} />;
   // A public join link is always a student entry point. An existing teacher
   // session must never leak the teacher dashboard into that URL.
-  if (joinCode && !session.roles.includes('STUDENT')) return <LoginScreen adminLogin={adminLogin} authNotice={authNotice} busy={busy} error={error} forgotPassword={false} googleLogin={googleLogin} joinCode={joinCode} joinInfo={joinInfo} onBack={() => openAuthRoute('')} onForgot={() => openAuthRoute('forgot-password')} onRequestReset={requestPasswordReset} status={status} />;
-  if (session.roles.includes('STUDENT') && joinInfo?.accessStartsAt && Date.parse(joinInfo.accessStartsAt) > now) return <CountdownScreen startsAt={joinInfo.accessStartsAt} title={joinInfo.title} />;
-  if (session.roles.includes('STUDENT') && view !== 'player' && !joinCode) return <div className="login-page"><div className="login-card"><p className="eyebrow">Administrator access</p><h1>Opening administrator sign in…</h1><p>The previous student test session is being closed securely.</p></div></div>;
-  if (session.roles.includes('STUDENT') && view !== 'player') return <div className="login-page"><div className="login-card"><h1>{error ? 'Activity unavailable' : 'Opening activity…'}</h1><p>{error || 'Please wait while InteractIQ prepares your activity.'}</p>{error&&<button className="primary-action primary-action--dark" onClick={signOut}>Sign out</button>}</div></div>;
+  if (joinCode && !isStudentContext) return <LoginScreen adminLogin={adminLogin} authNotice={authNotice} busy={busy} error={error} forgotPassword={false} googleLogin={googleLogin} joinCode={joinCode} joinInfo={joinInfo} onBack={() => openAuthRoute('')} onForgot={() => openAuthRoute('forgot-password')} onRequestReset={requestPasswordReset} status={status} />;
+  if (isStudentContext && joinInfo?.accessStartsAt && Date.parse(joinInfo.accessStartsAt) > now) return <CountdownScreen startsAt={joinInfo.accessStartsAt} title={joinInfo.title} />;
+  if (isStudentContext && view !== 'player' && !joinCode) return <div className="login-page"><div className="login-card"><p className="eyebrow">Administrator access</p><h1>Opening administrator sign in…</h1><p>The previous student test session is being closed securely.</p></div></div>;
+  if (isStudentContext && view !== 'player') return <div className="login-page"><div className="login-card"><h1>{error ? 'Activity unavailable' : 'Opening activity…'}</h1><p>{error || 'Please wait while InteractIQ prepares your activity.'}</p>{error&&<button className="primary-action primary-action--dark" onClick={signOut}>Sign out</button>}</div></div>;
   if (view === 'player' && selected) {
     if (selected.type === 'FLASHCARD_SET') return <FlashcardPlayer cards={flashcards} resource={selected} />;
     if (selected.type === 'ASSESSMENT' && attempt) return <AssignmentPlayer apiBase={apiBase} attempt={attempt} busy={busy === 'assignment' || busy === 'identity'} error={error} onIdentify={identifyStudent} onSubmit={submitAssignment} resource={selected} />;
