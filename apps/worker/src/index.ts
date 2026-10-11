@@ -1,4 +1,4 @@
-import type { ApiErrorCode, ApiResponse, HealthData, LiveParticipant, StorageInventory } from '@interactiq/contracts';
+import type { AiUsageSummary, ApiErrorCode, ApiResponse, HealthData, LiveParticipant, StorageInventory } from '@interactiq/contracts';
 import { AuthError, AuthService, type AuthEnvironment } from './auth/service';
 import { PasswordResetService } from './auth/password-reset';
 import { requirePermission, toTenantContext } from './auth/authorization';
@@ -17,8 +17,10 @@ export interface Env extends AuthEnvironment {
   RESEND_API_KEY?: string;
   PASSWORD_RESET_FROM_EMAIL?: string;
   PASSWORD_RESET_APP_URL?: string;
+  AI_GATEWAY_ID?: string;
+  AI_BACKUP_MODEL?: string;
   MEDIA?: R2Bucket;
-  AI?: { run(model: string, input: Record<string, unknown>): Promise<unknown> };
+  AI?: { run(model: string, input: Record<string, unknown>, options?: { gateway?: { id: string; skipCache?: boolean; collectLog?: boolean; metadata?: Record<string,string> } }): Promise<unknown> };
 }
 
 interface R2ObjectBody {
@@ -204,7 +206,7 @@ export const app = {
     const questionRepository = new QuestionRepository(env.DB);
     const resources = new ResourceService(resourceRepository, questionRepository);
     const questions = new QuestionService(resourceRepository, questionRepository);
-    const attempts = new AttemptService(env.DB, env.AI, env.MEDIA);
+    const attempts = new AttemptService(env.DB, env.AI, env.MEDIA, env.AI_GATEWAY_ID ?? 'default', env.AI_BACKUP_MODEL ?? 'google-ai-studio/gemini-2.5-flash');
     try {
       if (request.method === 'GET' && url.pathname === '/api/v1/storage/usage') {
         const session = await authenticatedSession(request, env, auth);
@@ -217,6 +219,16 @@ export const app = {
           cursor = page.truncated ? page.cursor : undefined;
         } while (cursor);
         return json(request, env, { success: true, data: { bytes, objects } });
+      }
+      if(request.method==='GET'&&url.pathname==='/api/v1/ai/usage'){
+        const session=await authenticatedSession(request,env,auth);requirePermission(toTenantContext(session.data),'resource.delete');const tenantId=session.data.tenant.id;
+        const usage=await env.DB.prepare(`SELECT usage_date AS date,provider,request_count AS requests,successful_count AS successful,failed_count AS failed,input_tokens AS inputTokens,output_tokens AS outputTokens
+          FROM ai_usage_daily WHERE tenant_id=? AND usage_date>=date('now','-13 days') ORDER BY usage_date DESC,provider`).bind(tenantId).all<Record<string,unknown>>();
+        const daily=usage.results.map((row)=>({date:String(row.date),provider:String(row.provider),requests:Number(row.requests),successful:Number(row.successful),failed:Number(row.failed),inputTokens:Number(row.inputTokens),outputTokens:Number(row.outputTokens)}));
+        const todayDate=new Date().toISOString().slice(0,10);const todayRows=daily.filter((row)=>row.date===todayDate);const sum=(key:'requests'|'successful'|'failed'|'inputTokens'|'outputTokens')=>todayRows.reduce((total,row)=>total+row[key],0);
+        const pending=await env.DB.prepare(`SELECT COUNT(*) AS count FROM attempt_answers aa JOIN attempts a ON a.id=aa.attempt_id WHERE a.tenant_id=? AND aa.ai_marking_status='PENDING' AND aa.teacher_points IS NULL`).bind(tenantId).first<{count:number}>();
+        const data:AiUsageSummary={gatewayId:env.AI_GATEWAY_ID??'default',pendingMarking:Number(pending?.count??0),today:{requests:sum('requests'),successful:sum('successful'),failed:sum('failed'),inputTokens:sum('inputTokens'),outputTokens:sum('outputTokens'),cloudflareRequests:todayRows.filter((row)=>row.provider==='CLOUDFLARE').reduce((total,row)=>total+row.requests,0),geminiRequests:todayRows.filter((row)=>row.provider==='GEMINI').reduce((total,row)=>total+row.requests,0)},daily,budgetAlertsUrl:'https://dash.cloudflare.com/?to=/:account/billing'};
+        return json(request,env,{success:true,data});
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/storage/inventory') {
         const session = await authenticatedSession(request, env, auth); requirePermission(toTenantContext(session.data), 'resource.delete');
@@ -446,6 +458,11 @@ export const app = {
         if (!csrfToken) throw new AuthError(403, 'FORBIDDEN', 'CSRF validation failed.');
         await auth.requireCsrf(session.token, csrfToken);
         return json(request, env, { success: true, data: await attempts.grade(session.data.tenant.id, session.data.user.id, gradeRoute[1]!, gradeRoute[2]!, await parseJson(request)) });
+      }
+      const retryAiRoute=/^\/api\/v1\/reports\/attempts\/([0-9a-f-]{36})\/answers\/([0-9a-f-]{36})\/retry-ai$/i.exec(url.pathname);
+      if(request.method==='POST'&&retryAiRoute){
+        const session=await authenticatedSession(request,env,auth);requirePermission(toTenantContext(session.data),'report.read');const csrfToken=request.headers.get('x-csrf-token');if(!csrfToken)throw new AuthError(403,'FORBIDDEN','CSRF validation failed.');await auth.requireCsrf(session.token,csrfToken);
+        return json(request,env,{success:true,data:await attempts.retryAiMarking(session.data.tenant.id,retryAiRoute[1]!,retryAiRoute[2]!)});
       }
       const finalizeReviewRoute = /^\/api\/v1\/reports\/attempts\/([0-9a-f-]{36})\/finalize$/i.exec(url.pathname);
       if (request.method === 'POST' && finalizeReviewRoute) {

@@ -351,6 +351,7 @@ export interface CreateQuestionInput {
 export interface UpdateQuestionInput extends CreateQuestionInput {}
 
 export type AttemptStatus = 'IN_PROGRESS' | 'COMPLETED';
+export type AiMarkingStatus = 'NOT_REQUIRED' | 'PENDING' | 'GRADED' | 'MANUAL';
 
 export interface AttemptAnswerInput {
   questionId: string;
@@ -376,20 +377,26 @@ export interface AttemptResult {
   assignmentReviewStatus?: AssignmentReviewStatus | null;
   assignmentMark?: number | null;
   assignmentFeedback?: string | null;
+  /** Number of submitted answers still waiting for AI or teacher marking. */
+  pendingAiCount?: number;
+  /** Maximum marks represented by the currently resolved provisional score. */
+  gradedMaxScore?: number;
   answerResults?: AttemptAnswerResult[];
 }
 
 export interface AttemptAnswerResult {
   questionId: string;
   correct: boolean | null;
-  points: number;
+  points: number | null;
   maxPoints: number;
+  aiMarkingStatus?: AiMarkingStatus;
   correctAnswer?: string | string[] | null;
 }
 
 export interface QuestionCheckResult extends AttemptAnswerResult {}
 
-export interface OpenEndedPreviewGradeResult extends QuestionCheckResult {
+export interface OpenEndedPreviewGradeResult extends Omit<QuestionCheckResult, 'points'> {
+  points: number;
   aiFeedback: string;
 }
 
@@ -409,9 +416,11 @@ export interface AttemptAnswerReview {
   correctAnswer: string | string[] | null;
   interaction: QuestionInteraction | null;
   isCorrect: boolean | null;
-  awardedPoints: number;
+  awardedPoints: number | null;
   aiSuggestedPoints: number | null;
   aiFeedback: string | null;
+  aiMarkingStatus: AiMarkingStatus;
+  aiProvider: string | null;
   teacherPoints: number | null;
   teacherFeedback: string | null;
   maxPoints: number;
@@ -429,7 +438,7 @@ export interface ResourceReport {
   resource: LearningResourceSummary;
   submissionCount: number;
   pendingReviewCount: number;
-  attempts: Array<Pick<AttemptReview, 'id' | 'status' | 'score' | 'maxScore' | 'submittedAt' | 'studentFullName' | 'studentClassName' | 'studentEmail' | 'finalReviewedAt' | 'duplicateNameWarning' | 'submissionFileUrl' | 'submissionFileName' | 'submissionMimeType' | 'submissionFileSize' | 'submissionNotes' | 'assignmentReviewStatus' | 'assignmentMark' | 'assignmentFeedback'>>;
+  attempts: Array<Pick<AttemptReview, 'id' | 'status' | 'score' | 'maxScore' | 'gradedMaxScore' | 'pendingAiCount' | 'submittedAt' | 'studentFullName' | 'studentClassName' | 'studentEmail' | 'finalReviewedAt' | 'duplicateNameWarning' | 'submissionFileUrl' | 'submissionFileName' | 'submissionMimeType' | 'submissionFileSize' | 'submissionNotes' | 'assignmentReviewStatus' | 'assignmentMark' | 'assignmentFeedback'>>;
 }
 
 export interface TenantThemeSettings {
@@ -485,4 +494,30 @@ export interface StorageInventory {
   d1: Array<{ key: string; label: string; rows: number; cleanup?: 'EXPIRED_SESSIONS' | 'ABANDONED_ATTEMPTS' | 'OLD_AUDIT_LOGS' }>;
   r2: Array<{ key: string; size: number; uploadedAt: string | null; referenceCount: number }>;
   totals: { d1Rows: number; r2Bytes: number; r2Objects: number };
+}
+
+export interface AiUsageDay {
+  date: string;
+  provider: string;
+  requests: number;
+  successful: number;
+  failed: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface AiUsageSummary {
+  gatewayId: string;
+  pendingMarking: number;
+  today: {
+    requests: number;
+    successful: number;
+    failed: number;
+    inputTokens: number;
+    outputTokens: number;
+    cloudflareRequests: number;
+    geminiRequests: number;
+  };
+  daily: AiUsageDay[];
+  budgetAlertsUrl: string;
 }

@@ -93,6 +93,16 @@ describe('human-readable review answers', () => {
 });
 
 describe('AI preview marking', () => {
+  it('uses AI Gateway retries before falling back to Gemini', async () => {
+    const statement:D1PreparedStatement={bind:()=>statement,first:async()=>null,all:async<T,>()=>({results:[{id:'question-1',type:'OPEN_ENDED',promptJson:JSON.stringify({type:'doc',content:[]}),configurationJson:JSON.stringify({options:[],acceptedAnswers:['gravity'],interaction:null}),points:2,timeLimitSeconds:null,position:0}] as T[],success:true,meta:{}}),run:async()=>({results:[],success:true,meta:{}})};
+    const db:D1Database={prepare:()=>statement,batch:async()=>[]};const models:string[]=[];const gateways:string[]=[];
+    const service=new AttemptService(db,{run:async(model,_input,options)=>{models.push(model);gateways.push(options?.gateway?.id??'');if(model.startsWith('@cf/'))throw new Error('quota exceeded');return{choices:[{message:{content:'{"points":2,"feedback":"Gemini vision fallback marked this response."}'}}],usage:{prompt_tokens:20,completion_tokens:8}};}},undefined,'interactiq');
+    const result=await service.previewOpenEnded('tenant-1','resource-1','question-1',{value:'Gravity pulls objects down.'});
+    expect(models).toEqual(['@cf/meta/llama-3.1-8b-instruct-fast','@cf/meta/llama-3.1-8b-instruct-fast','@cf/meta/llama-3.1-8b-instruct-fast','google-ai-studio/gemini-2.5-flash']);
+    expect(gateways).toEqual(['interactiq','interactiq','interactiq','interactiq']);
+    expect(result.points).toBe(2);
+  });
+
   it('grades an open-ended prototype from teacher key ideas without writing an attempt', async () => {
     const statement: D1PreparedStatement = {
       bind: () => statement,

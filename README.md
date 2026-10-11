@@ -31,3 +31,5 @@ Apply every pending migration in `apps/worker/migrations` before deploying the u
 ## Production configuration
 
 Set non-secret values in `apps/worker/wrangler.toml` and store credentials only with `wrangler secret put`. Never commit `.dev.vars`.
+
+AI marking failover, Gemini BYOK, pending-mark behavior, and budget controls are documented in [`docs/AI-MARKING-RESILIENCE.md`](docs/AI-MARKING-RESILIENCE.md).
