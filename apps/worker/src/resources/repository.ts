@@ -232,13 +232,13 @@ export class ResourceRepository {
     const result = await this.db.prepare(`SELECT id, name, object_key AS objectKey, size, content_type AS contentType, created_at AS createdAt
       FROM quiz_music_tracks WHERE tenant_id = ? ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END, created_at DESC, id DESC`)
       .bind(tenantId, selectedId).all<QuizMusicTrack & { objectKey: string }>();
-    return result.results.map(({ objectKey, ...track }) => ({ ...track, url: `/api/v1/media/${objectKey}` }));
+    return result.results.map(({ objectKey, ...track }) => ({ ...track, url: `/api/v1/media/${objectKey}?v=${encodeURIComponent(track.createdAt)}` }));
   }
 
   async findMusicTrack(tenantId: string, trackId: string): Promise<(QuizMusicTrack & { objectKey: string }) | null> {
     const row = await this.db.prepare(`SELECT id, name, object_key AS objectKey, size, content_type AS contentType, created_at AS createdAt
       FROM quiz_music_tracks WHERE tenant_id = ? AND id = ? LIMIT 1`).bind(tenantId, trackId).first<QuizMusicTrack & { objectKey: string }>();
-    return row ? { ...row, url: `/api/v1/media/${row.objectKey}` } : null;
+    return row ? { ...row, url: `/api/v1/media/${row.objectKey}?v=${encodeURIComponent(row.createdAt)}` } : null;
   }
 
   async createMusicTrack(tenantId: string, input: { id: string; name: string; objectKey: string; size: number; contentType: string }): Promise<QuizMusicTrack> {
