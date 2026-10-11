@@ -206,7 +206,7 @@ export const app = {
     const questionRepository = new QuestionRepository(env.DB);
     const resources = new ResourceService(resourceRepository, questionRepository);
     const questions = new QuestionService(resourceRepository, questionRepository);
-    const attempts = new AttemptService(env.DB, env.AI, env.MEDIA, env.AI_GATEWAY_ID ?? 'default', env.AI_BACKUP_MODEL ?? 'google-ai-studio/gemini-2.5-flash');
+    const attempts = new AttemptService(env.DB, env.AI, env.MEDIA, env.AI_GATEWAY_ID ?? 'default', env.AI_BACKUP_MODEL ?? 'google-ai-studio/gemini-3.8-flash');
     try {
       if (request.method === 'GET' && url.pathname === '/api/v1/storage/usage') {
         const session = await authenticatedSession(request, env, auth);

@@ -100,7 +100,7 @@ export const gradeAnswer = gradeQuestionAnswer;
 export class AttemptService {
   private readonly resources: ResourceRepository;
   private readonly questions: QuestionRepository;
-  constructor(private readonly db: D1Database, private readonly ai?: AiBinding, private readonly media?: MediaBinding, private readonly gatewayId='default', private readonly backupModel='google-ai-studio/gemini-2.5-flash') {
+  constructor(private readonly db: D1Database, private readonly ai?: AiBinding, private readonly media?: MediaBinding, private readonly gatewayId='default', private readonly backupModel='google-ai-studio/gemini-3.8-flash') {
     this.resources = new ResourceRepository(db);
     this.questions = new QuestionRepository(db);
   }

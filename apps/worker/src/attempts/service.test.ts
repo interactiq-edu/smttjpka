@@ -98,7 +98,7 @@ describe('AI preview marking', () => {
     const db:D1Database={prepare:()=>statement,batch:async()=>[]};const models:string[]=[];const gateways:string[]=[];
     const service=new AttemptService(db,{run:async(model,_input,options)=>{models.push(model);gateways.push(options?.gateway?.id??'');if(model.startsWith('@cf/'))throw new Error('quota exceeded');return{choices:[{message:{content:'{"points":2,"feedback":"Gemini vision fallback marked this response."}'}}],usage:{prompt_tokens:20,completion_tokens:8}};}},undefined,'interactiq');
     const result=await service.previewOpenEnded('tenant-1','resource-1','question-1',{value:'Gravity pulls objects down.'});
-    expect(models).toEqual(['@cf/meta/llama-3.1-8b-instruct-fast','@cf/meta/llama-3.1-8b-instruct-fast','@cf/meta/llama-3.1-8b-instruct-fast','google-ai-studio/gemini-2.5-flash']);
+    expect(models).toEqual(['@cf/meta/llama-3.1-8b-instruct-fast','@cf/meta/llama-3.1-8b-instruct-fast','@cf/meta/llama-3.1-8b-instruct-fast','google-ai-studio/gemini-3.8-flash']);
     expect(gateways).toEqual(['interactiq','interactiq','interactiq','interactiq']);
     expect(result.points).toBe(2);
   });

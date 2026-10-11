@@ -1,6 +1,6 @@
 # AI marking resilience
 
-InteractIQ sends preliminary marking requests through the Cloudflare AI Gateway named `default`. The primary model is Workers AI. If the primary model is unavailable after three application-level attempts with exponential backoff, InteractIQ calls `google-ai-studio/gemini-2.5-flash` through the same gateway.
+InteractIQ sends preliminary marking requests through the Cloudflare AI Gateway named `default`. The primary model is Workers AI. If the primary model is unavailable after three application-level attempts with exponential backoff, InteractIQ calls `google-ai-studio/gemini-3.8-flash` through the same gateway.
 
 ## Credential safety
 
@@ -10,7 +10,7 @@ Create a new Google AI Studio key, then store it in Cloudflare:
 
 1. Open **AI > AI Gateway > default > Provider Keys**.
 2. Add a Google AI Studio credential using the **default** BYOK alias.
-3. Keep `AI_BACKUP_MODEL = "google-ai-studio/gemini-2.5-flash"` in `wrangler.toml`.
+3. Keep `AI_BACKUP_MODEL = "google-ai-studio/gemini-3.8-flash"` in `wrangler.toml`.
 4. Run a Math Response preview and confirm the request appears in AI Gateway logs.
 
 Cloudflare documentation: <https://developers.cloudflare.com/ai-gateway/usage/providers/google-ai-studio/>
