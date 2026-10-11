@@ -84,6 +84,12 @@ describe('human-readable review answers', () => {
     const hotspot: LearningQuestion = { ...baseQuestion, type:'HOTSPOT', options:[], acceptedAnswers:[], interaction:{kind:'hotspot',imageUrl:'image.png',shape:'point',regions:[{id:'h1',points:[{x:.2,y:.3}]}]} };
     expect(displayAnswer('{"x":0.21,"y":0.35}',hotspot)).toBe('Selected point: 21% across, 35% down');
   });
+
+  it('renders structured typed and handwritten Math Response work for teacher review', () => {
+    const question:LearningQuestion={...baseQuestion,type:'MATH_RESPONSE',points:4,options:[],acceptedAnswers:[],interaction:{kind:'math_response',calculator:true,handwriting:true,parts:[{id:'formula',label:'Formula',enabled:true,marks:1,scheme:'F = ma'},{id:'method',label:'Method calculation',enabled:true,marks:2,scheme:'Show substitution'},{id:'answer',label:'Final answer',enabled:true,marks:1,scheme:'10 N'}]}};
+    const value=JSON.stringify({version:2,parts:{formula:{text:'F = ma',pages:[]},method:{text:'F = 2 × 5',pages:['data:image/jpeg;base64,abc']},answer:{text:'10 N',pages:[]}}});
+    expect(displayAnswer(value,question)).toEqual(['Formula: F = ma','Method calculation: F = 2 × 5 (1 handwritten page)','Final answer: 10 N']);
+  });
 });
 
 describe('AI preview marking', () => {

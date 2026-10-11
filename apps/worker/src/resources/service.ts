@@ -7,7 +7,7 @@ const resourceTypes = new Set<ResourceType>(['QUIZ', 'ASSESSMENT', 'FLASHCARD_SE
 const attemptPolicies = new Set<AttemptPolicy>(['ONCE_PER_EMAIL', 'MULTIPLE']);
 const resultReleasePolicies = new Set<ResultReleasePolicy>(['DETAILED_AFTER_SUBMISSION', 'SCORE_ONLY', 'TEACHER_REVIEW', 'IMMEDIATE_PER_QUESTION']);
 const nodeTypes = new Set(['paragraph', 'heading', 'text', 'bulletList', 'orderedList', 'listItem', 'blockquote', 'hardBreak', 'codeBlock', 'image']);
-const markTypes = new Set<RichTextMark['type']>(['bold', 'italic', 'underline', 'strike', 'link', 'highlight', 'textStyle']);
+const markTypes = new Set<RichTextMark['type']>(['bold', 'italic', 'underline', 'strike', 'superscript', 'subscript', 'link', 'highlight', 'textStyle']);
 
 const parseCreateInput = (value: unknown): CreateLearningResourceInput => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new AuthError(400, 'VALIDATION_ERROR', 'A JSON object is required.');

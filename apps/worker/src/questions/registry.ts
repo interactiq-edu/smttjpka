@@ -45,7 +45,7 @@ const parseAnswers = (value: unknown, type: QuestionType): string[] => {
     if (!Array.isArray(value) || value.length > 20 || value.some((answer) => typeof answer !== 'string' || !answer.trim() || answer.length > 500)) throw new AuthError(400,'VALIDATION_ERROR','Add valid matching answers.');
     return [[...new Set(value.map((answer)=>(answer as string).trim().toLocaleLowerCase()))].join('\n')];
   }
-  if (type === 'PASSAGE' || optionTypes.has(type) || (interactiveTypes.has(type) && type !== 'MATH_RESPONSE') || type === 'TRUE_FALSE') return [];
+  if (type === 'PASSAGE' || optionTypes.has(type) || interactiveTypes.has(type) || type === 'TRUE_FALSE') return [];
   if (type === 'OPEN_ENDED') {
     if (value === undefined || value === null) return [];
     if (!Array.isArray(value) || value.length > 50 || value.some((answer) => typeof answer !== 'string' || !answer.trim() || answer.length > 1000)) {
@@ -70,6 +70,19 @@ const parseInteraction = (value: unknown, type: QuestionType): QuestionInteracti
   };
   if (interaction.kind !== expected[type]) throw new AuthError(400, 'VALIDATION_ERROR', 'The interactive setup does not match the selected question type.');
   if ((type === 'FILL_IN_THE_BLANKS' || type === 'DRAG_AND_DROP') && (typeof interaction.template !== 'string' || !interaction.template.trim() || !Array.isArray(interaction.blanks) || interaction.blanks.length < 1)) throw new AuthError(400, 'VALIDATION_ERROR', 'Add a sentence and at least one blank.');
+  if (type === 'MATH_RESPONSE') {
+    if (typeof interaction.calculator !== 'boolean' || (interaction.handwriting !== undefined && typeof interaction.handwriting !== 'boolean')) throw new AuthError(400,'VALIDATION_ERROR','Choose valid Math Response tools.');
+    const parts=interaction.parts;
+    if (!Array.isArray(parts)||parts.length!==3) throw new AuthError(400,'VALIDATION_ERROR','Math Response needs Formula, Method calculation, and Final answer sections.');
+    const ids=new Set<string>();let total=0;
+    for(const entry of parts){
+      if(!entry||typeof entry!=='object'||Array.isArray(entry))throw new AuthError(400,'VALIDATION_ERROR','A Math Response marking section is invalid.');
+      const part=entry as Record<string,unknown>;
+      if(!['formula','method','answer'].includes(String(part.id))||ids.has(String(part.id))||typeof part.label!=='string'||!part.label.trim()||typeof part.enabled!=='boolean'||typeof part.marks!=='number'||!Number.isFinite(part.marks)||part.marks<.5||part.marks>100||typeof part.scheme!=='string'||part.scheme.length>4000||(part.enabled&&!part.scheme.trim()))throw new AuthError(400,'VALIDATION_ERROR','Enable at least one Math Response section and provide its marks and AI marking scheme.');
+      ids.add(String(part.id));if(part.enabled)total+=part.marks;
+    }
+    if(total<=0)throw new AuthError(400,'VALIDATION_ERROR','Math Response needs at least one enabled marking section.');
+  }
   if (type === 'REORDER') {
     if (!Array.isArray(interaction.items) || interaction.items.length < 2 || interaction.items.length > 20 || interaction.items.some((item) => typeof item !== 'string' || !item.trim())) throw new AuthError(400, 'VALIDATION_ERROR', 'Reorder needs between 2 and 20 complete items.');
     if (interaction.shufflePerStudent !== undefined && typeof interaction.shufflePerStudent !== 'boolean') throw new AuthError(400, 'VALIDATION_ERROR', 'The reorder reshuffle setting must be enabled or disabled.');
@@ -124,5 +137,7 @@ export const parseQuestionInput = (value: unknown): CreateQuestionInput => {
     if (answer !== 'true' && answer !== 'false') throw new AuthError(400, 'VALIDATION_ERROR', 'Select True or False as the correct answer.');
     options.find((option) => option.id === answer)!.isCorrect = true;
   }
-  return { type, prompt: requireDocument(body.prompt), options, acceptedAnswers: parseAnswers(body.acceptedAnswers, type), interaction: parseInteraction(body.interaction, type), points, timeLimitSeconds };
+  const interaction=parseInteraction(body.interaction,type);
+  if(interaction?.kind==='math_response'&&interaction.parts?.length){const rubricTotal=interaction.parts.filter((part)=>part.enabled).reduce((sum,part)=>sum+part.marks,0);if(Math.abs(rubricTotal-points)>.001)throw new AuthError(400,'VALIDATION_ERROR','Math Response total marks must equal the enabled section marks.');}
+  return { type, prompt: requireDocument(body.prompt), options, acceptedAnswers: parseAnswers(body.acceptedAnswers, type), interaction, points, timeLimitSeconds };
 };

@@ -129,7 +129,7 @@ export interface ResourceFolder {
 }
 
 export interface RichTextMark {
-  type: 'bold' | 'italic' | 'underline' | 'strike' | 'link' | 'highlight' | 'textStyle';
+  type: 'bold' | 'italic' | 'underline' | 'strike' | 'superscript' | 'subscript' | 'link' | 'highlight' | 'textStyle';
   attrs?: Record<string, string>;
 }
 
@@ -225,7 +225,7 @@ export type QuestionType =
 export type QuestionInteraction =
   | { kind: 'fill_blank'; template: string; blanks: Array<{ id: string; answers: string[]; mode: 'text' | 'dropdown'; options: string[] }>; ignoreAccents: boolean }
   | { kind: 'drag_drop'; template: string; blanks: Array<{ id: string; answer: string }>; distractors: string[] }
-  | { kind: 'math_response'; calculator: boolean }
+  | { kind: 'math_response'; calculator: boolean; handwriting?: boolean; parts?: Array<{ id: 'formula' | 'method' | 'answer'; label: string; enabled: boolean; marks: number; scheme: string }> }
   | { kind: 'labelling'; imageUrl: string; labels: Array<{ id: string; text: string; x: number; y: number }>; distractors: string[] }
   | { kind: 'hotspot'; imageUrl: string; shape: 'point' | 'rectangle' | 'polygon'; regions: Array<{ id: string; points: Array<{ x: number; y: number }> }> }
   | { kind: 'reorder'; items: string[]; shufflePerStudent?: boolean }
@@ -307,6 +307,7 @@ export const gradeQuestionAnswer = (question: LearningQuestion, value: string | 
     return { correct, points: correct || interaction.partialCredit ? question.points * Math.max(0, hits - wrong) / expected.size : 0 };
   }
   if (interaction?.kind === 'math_response') {
+    if (interaction.parts?.some((part) => part.enabled)) return { correct: null, points: 0 };
     const submitted = clean(Array.isArray(value) ? value.join('') : value).replace(/[×·]/g, '*').replace(/÷/g, '/');
     const correct = question.acceptedAnswers.some((answer) => clean(answer).replace(/[×·]/g, '*').replace(/÷/g, '/') === submitted);
     return { correct, points: correct ? question.points : 0 };

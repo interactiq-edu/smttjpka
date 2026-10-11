@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { Node } from '@tiptap/core';
+import { Mark, Node } from '@tiptap/core';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
@@ -20,9 +20,28 @@ const ImageNode = Node.create({
   renderHTML: ({ HTMLAttributes }) => ['img', { ...HTMLAttributes, loading: 'lazy' }],
 });
 
+const Superscript = Mark.create({
+  name: 'superscript',
+  excludes: 'subscript',
+  parseHTML: () => [{ tag: 'sup' }],
+  renderHTML: () => ['sup', 0],
+});
+
+const Subscript = Mark.create({
+  name: 'subscript',
+  excludes: 'superscript',
+  parseHTML: () => [{ tag: 'sub' }],
+  renderHTML: () => ['sub', 0],
+});
+
+const symbols = ['±','×','÷','≈','≠','≤','≥','∞','π','θ','Δ','Σ','∫','√','°','→','↔','∠','∥','⊥'];
+const equations = ['x²','xⁿ','a₁','a/b','√(x)','∛(x)','|x|','log(x)','ln(x)','sin(θ)','cos(θ)','tan(θ)','Σ(x)','∫ f(x) dx','dy/dx'];
+
 export function RichTextEditor({ value, onChange, onUploadImage }: { value: RichTextDocument; onChange: (document: RichTextDocument) => void; onUploadImage?: (file: File) => Promise<string> }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [imageError, setImageError] = useState('');
+  const [picker, setPicker] = useState<'symbol' | 'equation' | null>(null);
+  const [equation, setEquation] = useState('');
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
@@ -30,6 +49,8 @@ export function RichTextEditor({ value, onChange, onUploadImage }: { value: Rich
       TextStyle,
       Color,
       Highlight.configure({ multicolor: true }),
+      Superscript,
+      Subscript,
       Link.configure({ openOnClick: false, autolink: false, protocols: ['http', 'https'], HTMLAttributes: { rel: 'noopener noreferrer nofollow', target: '_blank' } }),
       ImageNode,
     ],
@@ -63,6 +84,7 @@ export function RichTextEditor({ value, onChange, onUploadImage }: { value: Rich
       setImageError('');
     } catch (error) { setImageError(error instanceof Error ? error.message : 'Unable to upload this image.'); }
   };
+  const insertText = (text: string) => { editor.chain().focus().insertContent(text).run(); setPicker(null); };
 
   return <div className="rich-editor">
     <div className="rich-editor__toolbar" aria-label="Formatting toolbar">
@@ -73,6 +95,9 @@ export function RichTextEditor({ value, onChange, onUploadImage }: { value: Rich
       <button className={editor.isActive('italic') ? 'is-active' : ''} onClick={command(() => editor.chain().toggleItalic().run())} type="button"><em>I</em></button>
       <button className={editor.isActive('underline') ? 'is-active' : ''} onClick={command(() => editor.chain().toggleUnderline().run())} type="button"><u>U</u></button>
       <button className={editor.isActive('strike') ? 'is-active' : ''} onClick={command(() => editor.chain().toggleStrike().run())} type="button"><s>S</s></button>
+      <button aria-label="Superscript" className={editor.isActive('superscript') ? 'is-active' : ''} onClick={command(() => editor.chain().toggleMark('superscript').run())} type="button">x<sup>2</sup></button>
+      <button aria-label="Subscript" className={editor.isActive('subscript') ? 'is-active' : ''} onClick={command(() => editor.chain().toggleMark('subscript').run())} type="button">x<sub>2</sub></button>
+      <label className="toolbar-colour" title="Font colour"><span>A</span><input aria-label="Font colour" type="color" value={String(editor.getAttributes('textStyle').color ?? '#17151c')} onChange={(event) => editor.chain().focus().setColor(event.target.value).run()} /></label>
       <button className={editor.isActive('highlight') ? 'is-active' : ''} onClick={command(() => editor.chain().toggleHighlight({ color: '#f8e2b8' }).run())} type="button">Highlight</button>
       <button className={editor.isActive('link') ? 'is-active' : ''} onClick={addLink} type="button">Link</button>
       <span className="toolbar-divider" />
@@ -80,6 +105,8 @@ export function RichTextEditor({ value, onChange, onUploadImage }: { value: Rich
       <button className={editor.isActive('bulletList') ? 'is-active' : ''} onClick={command(() => editor.chain().toggleBulletList().run())} type="button">List</button>
       <button className={editor.isActive('orderedList') ? 'is-active' : ''} onClick={command(() => editor.chain().toggleOrderedList().run())} type="button">1. List</button>
       <button className={editor.isActive('blockquote') ? 'is-active' : ''} onClick={command(() => editor.chain().toggleBlockquote().run())} type="button">Quote</button>
+      <button onClick={() => setPicker('symbol')} type="button">Σ Symbol</button>
+      <button onClick={() => setPicker('equation')} type="button">ƒ(x) Equation</button>
       <button onClick={() => inputRef.current?.click()} type="button">Upload image</button>
       <button className="toolbar-danger" disabled={!editor.isActive('image')} onClick={command(() => editor.chain().deleteSelection().run())} type="button">Delete image</button>
       <button onClick={command(() => editor.chain().unsetAllMarks().clearNodes().run())} type="button">Clear</button>
@@ -87,5 +114,6 @@ export function RichTextEditor({ value, onChange, onUploadImage }: { value: Rich
     <input accept="image/png,image/jpeg,image/webp,image/gif" aria-label="Upload image" className="visually-hidden" onChange={addImage} ref={inputRef} type="file" />
     {imageError && <p className="message message--error">{imageError}</p>}
     <EditorContent editor={editor} />
+    {picker && <div className="math-picker-backdrop" role="presentation" onMouseDown={() => setPicker(null)}><section aria-modal="true" className="math-picker" onMouseDown={(event) => event.stopPropagation()} role="dialog"><button aria-label="Close" className="math-picker__close" onClick={() => setPicker(null)} type="button">×</button><p className="eyebrow">{picker === 'symbol' ? 'Insert symbol' : 'Equation editor'}</p><h3>{picker === 'symbol' ? 'Choose a mathematical symbol' : 'Build or type an equation'}</h3><div className="math-picker__grid">{(picker === 'symbol' ? symbols : equations).map((item) => <button key={item} onClick={() => insertText(item)} type="button">{item}</button>)}</div>{picker === 'equation' && <div className="math-picker__custom"><label>Custom equation<input autoFocus placeholder="e.g. F = ma or σ = P/A" value={equation} onChange={(event) => setEquation(event.target.value)} /></label><button className="primary-action primary-action--dark" disabled={!equation.trim()} onClick={() => { insertText(equation.trim()); setEquation(''); }} type="button">Insert equation</button></div>}</section></div>}
   </div>;
 }

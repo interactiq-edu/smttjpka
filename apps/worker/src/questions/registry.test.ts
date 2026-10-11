@@ -102,4 +102,14 @@ describe('question registry', () => {
     expect(parseQuestionInput({ type: 'REORDER', prompt, interaction: { ...interaction, shufflePerStudent: false } }))
       .toMatchObject({ interaction: { kind: 'reorder', shufflePerStudent: false } });
   });
+
+  it('accepts structured Math Response rubrics whose section marks match the question total', () => {
+    const interaction={kind:'math_response',calculator:true,handwriting:true,parts:[
+      {id:'formula',label:'Formula',enabled:true,marks:1,scheme:'Use F = ma.'},
+      {id:'method',label:'Method calculation',enabled:true,marks:2,scheme:'Substitute the values and show units.'},
+      {id:'answer',label:'Final answer',enabled:true,marks:1,scheme:'10 N, accept 9.9–10.1 N.'},
+    ]};
+    expect(parseQuestionInput({type:'MATH_RESPONSE',prompt,points:4,interaction})).toMatchObject({type:'MATH_RESPONSE',points:4,acceptedAnswers:[],interaction:{kind:'math_response',handwriting:true}});
+    expect(()=>parseQuestionInput({type:'MATH_RESPONSE',prompt,points:5,interaction})).toThrow('total marks');
+  });
 });
