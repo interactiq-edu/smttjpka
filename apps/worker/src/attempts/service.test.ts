@@ -98,7 +98,7 @@ describe('AI preview marking', () => {
     const db:D1Database={prepare:()=>statement,batch:async()=>[]};const models:string[]=[];const gateways:string[]=[];const backupUrls:string[]=[];
     const service=new AttemptService(db,{run:async(model,_input,options)=>{models.push(model);gateways.push(options?.gateway?.id??'');throw new Error('quota exceeded');}},undefined,'interactiq','gemini-3.8-flash','account-id','gateway-token',async(input,init)=>{backupUrls.push(String(input));expect((init?.headers as Record<string,string>)['cf-aig-authorization']).toBe('Bearer gateway-token');return new Response(JSON.stringify({candidates:[{content:{parts:[{text:'{"points":2,"feedback":"Gemini vision fallback marked this response."}'}]}}],usageMetadata:{promptTokenCount:20,candidatesTokenCount:8}}),{status:200,headers:{'content-type':'application/json'}});});
     const result=await service.previewOpenEnded('tenant-1','resource-1','question-1',{value:'Gravity pulls objects down.'});
-    expect(models).toEqual(['@cf/meta/llama-3.1-8b-instruct-fast']);
+    expect(models).toEqual(['@cf/meta/llama-3.1-8b-instruct-fp8']);
     expect(gateways).toEqual(['interactiq']);
     expect(backupUrls[0]).toContain('/interactiq/google-ai-studio/v1beta/models/gemini-3.8-flash:generateContent');
     expect(result.points).toBe(2);
@@ -141,8 +141,8 @@ describe('AI preview marking', () => {
       run: async () => { throw new Error('Preview grading must not write to D1.'); },
     };
     const db:D1Database={prepare:()=>statement,batch:async()=>{throw new Error('Preview grading must not batch writes.');}};
-    let aiInput:Record<string,unknown>|null=null;
-    const service=new AttemptService(db,{run:async (_model,input)=>{aiInput=input;return{response:{points:4,feedback:'All sections match the reference.'}};}});
+    let aiInput:Record<string,unknown>|null=null;let aiModel='';
+    const service=new AttemptService(db,{run:async (model,input)=>{aiModel=model;aiInput=input;return{response:{points:4,feedback:'All sections match the reference.'}};}});
     const handwriting='data:image/png;base64,c3R1ZGVudC1oYW5kd3JpdGluZw==';
     const value=JSON.stringify({version:2,parts:{formula:{text:'',pages:[handwriting]},method:{text:'',pages:[]},answer:{text:'',pages:[]}}});
     const result=await service.previewOpenEnded('tenant-1','resource-1','question-math',{value});
@@ -152,6 +152,8 @@ describe('AI preview marking', () => {
     expect(serialized).toContain('https://example.com/formula-reference.png');
     expect(serialized).toContain('Student handwritten Formula page');
     expect(serialized).toContain(handwriting);
+    expect(aiModel).toBe('@cf/qwen/qwen3.8-27b');
+    expect(aiInput).toMatchObject({chat_template_kwargs:{enable_thinking:false},max_completion_tokens:512});
   });
 });
 
