@@ -138,6 +138,33 @@ describe('InteractIQ API foundation', () => {
     expect(await response.text()).toBe('');
   });
 
+  it('serves byte ranges for browser audio playback', async () => {
+    const ranges: Array<{ offset: number; length: number } | undefined> = [];
+    const mediaEnv: Env = {
+      ...env,
+      MEDIA: {
+        get: async (_key, options) => {
+          ranges.push(options?.range);
+          return {
+            body: new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new Uint8Array(options?.range?.length ?? 8)); controller.close(); } }),
+            size: 2_265_444,
+            httpMetadata: { contentType: 'audio/mpeg' },
+          };
+        },
+        put: async () => ({}),
+        delete: async () => undefined,
+        list: async () => ({ objects: [], truncated: false }),
+      },
+    };
+    const response = await app.fetch(new Request('https://api.example.test/api/v1/media/tenants/11111111-1111-4111-8111-111111111111/music/song.mp3', { headers: { range: 'bytes=0-1023' } }), mediaEnv);
+
+    expect(response.status).toBe(206);
+    expect(response.headers.get('content-range')).toBe('bytes 0-1023/2265444');
+    expect(response.headers.get('content-length')).toBe('1024');
+    expect(ranges).toEqual([undefined, { offset: 0, length: 1024 }]);
+    expect((await response.arrayBuffer()).byteLength).toBe(1024);
+  });
+
   it('renews a cookie-backed session for a new browser tab from an allowed origin', async () => {
     const executed: string[] = [];
     const sessionDatabase: D1Database = {

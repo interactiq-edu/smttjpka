@@ -32,7 +32,7 @@ interface WorkerExecutionContext {
 }
 
 interface R2Bucket {
-  get(key: string): Promise<R2ObjectBody | null>;
+  get(key: string, options?: { range?: { offset: number; length: number } }): Promise<R2ObjectBody | null>;
   put(key: string, value: ArrayBuffer, options?: { httpMetadata?: { contentType?: string } }): Promise<unknown>;
   delete(keys: string | string[]): Promise<void>;
   list(options?: { prefix?: string; cursor?: string; limit?: number }): Promise<{ objects: Array<{ key: string; size: number; uploaded?: Date }>; truncated: boolean; cursor?: string }>;
@@ -65,6 +65,7 @@ const corsHeaders = (request: Request, env: Env): Headers => {
     headers.set('access-control-allow-credentials', 'true');
     headers.set('access-control-allow-headers', 'authorization, content-type, x-csrf-token');
     headers.set('access-control-allow-methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+    headers.set('access-control-expose-headers', 'content-length, content-range, accept-ranges');
     headers.set('vary', 'Origin');
   }
   return headers;
@@ -158,19 +159,45 @@ export const app = {
           throw error;
         }
       }
-      const object = await env.MEDIA.get(key);
+      let object = await env.MEDIA.get(key);
       if (!object) return errorResponse(request, env, 404, 'NOT_FOUND', 'The requested image does not exist.');
       const headers = corsHeaders(request, env);
       headers.set('cache-control', assignmentKey ? 'private, no-store' : 'public, max-age=31536000, immutable');
       headers.set('content-type', object.httpMetadata?.contentType ?? 'application/octet-stream');
-      if(typeof object.size==='number')headers.set('content-length', String(object.size));
       headers.set('accept-ranges', 'bytes');
       headers.set('content-disposition', 'inline');
       if (url.searchParams.get('download') === '1') {
         const requestedName = (url.searchParams.get('name') ?? key.split('/').pop() ?? 'download').replace(/[\r\n"\\]/g, '_').slice(0, 180);
         headers.set('content-disposition', `attachment; filename="${requestedName}"`);
       }
-      return new Response(request.method === 'HEAD' ? null : object.body, { headers });
+      let status = 200;
+      const totalSize = object.size;
+      const rangeHeader = request.headers.get('range');
+      if (rangeHeader && typeof totalSize === 'number') {
+        const match = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader.trim());
+        if (!match || (!match[1] && !match[2])) {
+          headers.set('content-range', `bytes */${totalSize}`);
+          return new Response(null, { status: 416, headers });
+        }
+        const suffixLength = match[1] ? null : Number(match[2]);
+        const start = suffixLength === null ? Number(match[1]) : Math.max(0, totalSize - suffixLength);
+        const requestedEnd = match[2] && match[1] ? Number(match[2]) : totalSize - 1;
+        const end = Math.min(requestedEnd, totalSize - 1);
+        if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || start >= totalSize || end < start) {
+          headers.set('content-range', `bytes */${totalSize}`);
+          return new Response(null, { status: 416, headers });
+        }
+        const length = end - start + 1;
+        const rangedObject = await env.MEDIA.get(key, { range: { offset: start, length } });
+        if (!rangedObject) return errorResponse(request, env, 404, 'NOT_FOUND', 'The requested image does not exist.');
+        object = rangedObject;
+        status = 206;
+        headers.set('content-range', `bytes ${start}-${end}/${totalSize}`);
+        headers.set('content-length', String(length));
+      } else if (typeof totalSize === 'number') {
+        headers.set('content-length', String(totalSize));
+      }
+      return new Response(request.method === 'HEAD' ? null : object.body, { status, headers });
     }
     const auth = new AuthService(env);
     const resourceRepository = new ResourceRepository(env.DB);
