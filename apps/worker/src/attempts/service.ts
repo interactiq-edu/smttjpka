@@ -404,6 +404,13 @@ export class AttemptService {
     throw last instanceof Error?last:new Error('Gemini gateway request failed.');
   }
 
+  async testGeminiBackup(tenantId:string):Promise<{ok:true;provider:'GEMINI';model:string;reply:string}>{
+    const response=await this.runGeminiProvider(tenantId,{messages:[{role:'user',content:'Return JSON only: {"status":"OK"}'}],max_completion_tokens:32},1) as {candidates?:Array<{content?:{parts?:Array<{text?:unknown}>}}>};
+    const reply=response.candidates?.[0]?.content?.parts?.map((part)=>String(part.text??'')).join('').trim()??'';
+    if(!reply)throw new Error('Gemini returned an empty diagnostic response.');
+    return {ok:true,provider:'GEMINI',model:this.backupModel,reply};
+  }
+
   private async aiGrade(tenantId:string,question: LearningQuestion, answer: string | string[]): Promise<AiGradeResult | null> {
     if (!this.ai) return null;
     try {

@@ -521,3 +521,10 @@ export interface AiUsageSummary {
   daily: AiUsageDay[];
   budgetAlertsUrl: string;
 }
+
+export interface AiBackupTestResult {
+  ok: true;
+  provider: 'GEMINI';
+  model: string;
+  reply: string;
+}

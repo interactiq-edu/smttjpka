@@ -232,6 +232,10 @@ export const app = {
         const data:AiUsageSummary={gatewayId:env.AI_GATEWAY_ID??'default',pendingMarking:Number(pending?.count??0),today:{requests:sum('requests'),successful:sum('successful'),failed:sum('failed'),inputTokens:sum('inputTokens'),outputTokens:sum('outputTokens'),cloudflareRequests:todayRows.filter((row)=>row.provider==='CLOUDFLARE').reduce((total,row)=>total+row.requests,0),geminiRequests:todayRows.filter((row)=>row.provider==='GEMINI').reduce((total,row)=>total+row.requests,0)},daily,budgetAlertsUrl:'https://dash.cloudflare.com/?to=/:account/billing'};
         return json(request,env,{success:true,data});
       }
+      if(request.method==='POST'&&url.pathname==='/api/v1/ai/test-backup'){
+        const session=await authenticatedSession(request,env,auth);requirePermission(toTenantContext(session.data),'resource.delete');requireAllowedBrowserOrigin(request,env);
+        try{return json(request,env,{success:true,data:await attempts.testGeminiBackup(session.data.tenant.id)});}catch{return errorResponse(request,env,503,'CONFIGURATION_ERROR','Gemini backup connection failed. Check the AI Gateway token, Google AI Studio key, and AI Gateway logs.');}
+      }
       if (request.method === 'GET' && url.pathname === '/api/v1/storage/inventory') {
         const session = await authenticatedSession(request, env, auth); requirePermission(toTenantContext(session.data), 'resource.delete');
         const tenantId=session.data.tenant.id;
