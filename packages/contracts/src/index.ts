@@ -229,8 +229,8 @@ export type QuestionInteraction =
   | { kind: 'labelling'; imageUrl: string; labels: Array<{ id: string; text: string; x: number; y: number }>; distractors: string[] }
   | { kind: 'hotspot'; imageUrl: string; shape: 'point' | 'rectangle' | 'polygon'; regions: Array<{ id: string; points: Array<{ x: number; y: number }> }> }
   | { kind: 'reorder'; items: string[]; shufflePerStudent?: boolean }
-  | { kind: 'categorize'; categories: Array<{ id: string; name: string; items: Array<{ id: string; text: string }> }>; partialCredit: boolean }
-  | { kind: 'match'; pairs: Array<{ id: string; prompt: string; response: string }>; partialCredit: boolean }
+  | { kind: 'categorize'; categories: Array<{ id: string; name: string; items: Array<{ id: string; text: string; imageUrl?: string | null }> }>; partialCredit: boolean }
+  | { kind: 'match'; pairs: Array<{ id: string; prompt: string; response: string; promptImageUrl?: string | null; responseImageUrl?: string | null }>; partialCredit: boolean }
   | { kind: 'match_table_grid'; rows: Array<{ id: string; text: string }>; columns: Array<{ id: string; text: string }>; correctCells: string[]; allowMultiplePerRow: boolean; partialCredit: boolean };
 
 export interface QuestionOption {

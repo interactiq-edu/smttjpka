@@ -13,16 +13,17 @@ const promptText = (question: LearningQuestion): string => {
   const walk = (nodes: LearningQuestion['prompt']['content']): string => nodes.map((node) => `${node.text ?? ''}${node.content ? walk(node.content) : ''}`).join(' ');
   return walk(question.prompt.content).replace(/\s+/g, ' ').trim();
 };
+const visualLabel = (text: string | undefined, imageUrl: string | null | undefined): string => text?.trim() || (imageUrl ? '[Image]' : '');
 
 export const displayAnswer = (value: string | string[], question: LearningQuestion): string | string[] => {
   if (question.interaction?.kind === 'categorize') {
     const categories = question.interaction.categories;
-    const rendered = (Array.isArray(value) ? value : [value]).map((entry) => { const [itemId,categoryId]=entry.split(':'); const category=categories.find((candidate)=>candidate.id===categoryId); const item=categories.flatMap((candidate)=>candidate.items).find((candidate)=>candidate.id===itemId); return `${item?.text ?? itemId} → ${category?.name ?? categoryId}`; });
+    const rendered = (Array.isArray(value) ? value : [value]).map((entry) => { const [itemId,categoryId]=entry.split(':'); const category=categories.find((candidate)=>candidate.id===categoryId); const item=categories.flatMap((candidate)=>candidate.items).find((candidate)=>candidate.id===itemId); return `${item ? visualLabel(item.text,item.imageUrl) : itemId} → ${category?.name ?? categoryId}`; });
     return rendered;
   }
   if (question.interaction?.kind === 'match') {
     const pairs = question.interaction.pairs;
-    return (Array.isArray(value) ? value : [value]).map((entry) => { const [promptId,responseId]=entry.split(':'); const prompt=pairs.find((pair)=>pair.id===promptId); const response=pairs.find((pair)=>pair.id===responseId); return `${prompt?.prompt ?? 'Unknown prompt'} → ${response?.response ?? 'Unknown answer'}`; });
+    return (Array.isArray(value) ? value : [value]).map((entry) => { const [promptId,responseId]=entry.split(':'); const prompt=pairs.find((pair)=>pair.id===promptId); const response=pairs.find((pair)=>pair.id===responseId); return `${prompt ? visualLabel(prompt.prompt,prompt.promptImageUrl) : 'Unknown prompt'} → ${response ? visualLabel(response.response,response.responseImageUrl) : 'Unknown answer'}`; });
   }
   if (question.interaction?.kind === 'match_table_grid') {
     const grid = question.interaction;
@@ -48,8 +49,8 @@ const correctAnswer = (question: LearningQuestion): string | string[] | null => 
   if (question.interaction?.kind === 'fill_blank') return question.interaction.blanks.map((blank) => blank.answers.join(' / '));
   if (question.interaction?.kind === 'drag_drop') return question.interaction.blanks.map((blank) => blank.answer);
   if (question.interaction?.kind === 'reorder') return question.interaction.items;
-  if (question.interaction?.kind === 'categorize') return question.interaction.categories.flatMap((category) => category.items.map((item) => `${item.text} → ${category.name}`));
-  if (question.interaction?.kind === 'match') return question.interaction.pairs.map((pair) => `${pair.prompt} → ${pair.response}`);
+  if (question.interaction?.kind === 'categorize') return question.interaction.categories.flatMap((category) => category.items.map((item) => `${visualLabel(item.text,item.imageUrl)} → ${category.name}`));
+  if (question.interaction?.kind === 'match') return question.interaction.pairs.map((pair) => `${visualLabel(pair.prompt,pair.promptImageUrl)} → ${visualLabel(pair.response,pair.responseImageUrl)}`);
   if (question.interaction?.kind === 'match_table_grid') { const grid=question.interaction; return grid.correctCells.map((cell) => { const [rowId,columnId]=cell.split(':'); return `${grid.rows.find((row)=>row.id===rowId)?.text ?? rowId} → ${grid.columns.find((column)=>column.id===columnId)?.text ?? columnId}`; }); }
   if (question.type !== 'OPEN_ENDED' && question.acceptedAnswers.length) return question.acceptedAnswers;
   return null;

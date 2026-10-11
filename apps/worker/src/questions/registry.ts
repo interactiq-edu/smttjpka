@@ -80,12 +80,21 @@ const parseInteraction = (value: unknown, type: QuestionType): QuestionInteracti
     if (!Array.isArray(categories) || categories.length < 2 || categories.length > 8 || categories.some((category) => {
       if (!category || typeof category !== 'object') return true;
       const item = category as Record<string, unknown>;
-      return typeof item.id !== 'string' || typeof item.name !== 'string' || !item.name.trim() || !Array.isArray(item.items) || item.items.length < 1 || item.items.length > 20 || item.items.some((answer) => !answer || typeof answer !== 'object' || typeof (answer as Record<string, unknown>).id !== 'string' || typeof (answer as Record<string, unknown>).text !== 'string' || !(answer as Record<string, unknown>).text?.toString().trim());
+      return typeof item.id !== 'string' || typeof item.name !== 'string' || !item.name.trim() || !Array.isArray(item.items) || item.items.length < 1 || item.items.length > 20 || item.items.some((answer) => {
+        if (!answer || typeof answer !== 'object') return true;
+        const candidate=answer as Record<string,unknown>; const text=candidate.text; const imageUrl=candidate.imageUrl;
+        return typeof candidate.id !== 'string' || typeof text !== 'string' || text.length > 1000 || (imageUrl !== undefined && imageUrl !== null && (typeof imageUrl !== 'string' || !imageUrl.trim() || imageUrl.length > 4000)) || (!text.trim() && !(typeof imageUrl === 'string' && imageUrl.trim()));
+      });
     })) throw new AuthError(400, 'VALIDATION_ERROR', 'Categorize needs 2 to 8 named categories with at least one answer in each category.');
   }
   if (type === 'MATCH') {
     const pairs = interaction.pairs;
-    if (!Array.isArray(pairs) || pairs.length < 2 || pairs.length > 12 || pairs.some((pair) => !pair || typeof pair !== 'object' || typeof (pair as Record<string,unknown>).id !== 'string' || typeof (pair as Record<string,unknown>).prompt !== 'string' || !(pair as Record<string,unknown>).prompt || typeof (pair as Record<string,unknown>).response !== 'string' || !(pair as Record<string,unknown>).response)) throw new AuthError(400, 'VALIDATION_ERROR', 'Match needs between 2 and 12 complete pairs.');
+    if (!Array.isArray(pairs) || pairs.length < 2 || pairs.length > 12 || pairs.some((pair) => {
+      if (!pair || typeof pair !== 'object') return true;
+      const candidate=pair as Record<string,unknown>; const prompt=candidate.prompt; const response=candidate.response; const promptImage=candidate.promptImageUrl; const responseImage=candidate.responseImageUrl;
+      const invalidImage=(image:unknown)=>image !== undefined && image !== null && (typeof image !== 'string' || !image.trim() || image.length > 4000);
+      return typeof candidate.id !== 'string' || typeof prompt !== 'string' || typeof response !== 'string' || prompt.length > 1000 || response.length > 1000 || invalidImage(promptImage) || invalidImage(responseImage) || (!prompt.trim() && !(typeof promptImage === 'string' && promptImage.trim())) || (!response.trim() && !(typeof responseImage === 'string' && responseImage.trim()));
+    })) throw new AuthError(400, 'VALIDATION_ERROR', 'Match needs between 2 and 12 complete text or image pairs.');
   }
   if (type === 'MATCH_TABLE_GRID') {
     const rows=interaction.rows, columns=interaction.columns, correctCells=interaction.correctCells;
