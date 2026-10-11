@@ -236,7 +236,7 @@ export class AttemptService {
         a.assignment_review_status AS assignmentReviewStatus, a.assignment_mark AS assignmentMark, a.assignment_feedback AS assignmentFeedback,
         a.final_reviewed_at AS finalReviewedAt,
         (SELECT COUNT(*) FROM attempt_answers pending WHERE pending.attempt_id=a.id AND pending.ai_marking_status='PENDING' AND pending.teacher_points IS NULL) AS pendingAiCount,
-        (SELECT COALESCE(SUM(q.points),0) FROM attempt_answers resolved JOIN questions q ON q.id=resolved.question_id WHERE resolved.attempt_id=a.id AND NOT (resolved.ai_marking_status='PENDING' AND resolved.teacher_points IS NULL)) AS gradedMaxScore,
+        (COALESCE(a.max_score,0) - (SELECT COALESCE(SUM(q.points),0) FROM attempt_answers pending_marks JOIN questions q ON q.id=pending_marks.question_id WHERE pending_marks.attempt_id=a.id AND pending_marks.ai_marking_status='PENDING' AND pending_marks.teacher_points IS NULL)) AS gradedMaxScore,
         (CASE WHEN a.submission_file_url IS NOT NULL THEN a.assignment_review_status <> 'REVIEWED' ELSE a.final_reviewed_at IS NULL END) AS pendingReview,
         EXISTS (SELECT 1 FROM attempts other WHERE other.tenant_id = a.tenant_id AND other.status = 'COMPLETED'
           AND other.user_id <> a.user_id AND LOWER(TRIM(other.student_full_name)) = LOWER(TRIM(a.student_full_name))) AS duplicateNameWarning
@@ -279,7 +279,7 @@ export class AttemptService {
       aiFeedback: row.aiFeedback ? String(row.aiFeedback) : null, teacherPoints: row.teacherPoints === null ? null : Number(row.teacherPoints),
       teacherFeedback: row.teacherFeedback ? String(row.teacherFeedback) : null, aiMarkingStatus, aiProvider:row.aiProvider?String(row.aiProvider):null, maxPoints: Number(row.maxPoints) }); });
     const pendingAiCount=answers.filter((answer)=>answer.aiMarkingStatus==='PENDING'&&answer.teacherPoints===null).length;
-    const gradedMaxScore=answers.reduce((sum,answer)=>sum+(answer.aiMarkingStatus==='PENDING'&&answer.teacherPoints===null?0:answer.maxPoints),0);
+    const gradedMaxScore=Math.max(0,Number(attempt.maxScore??0)-answers.reduce((sum,answer)=>sum+(answer.aiMarkingStatus==='PENDING'&&answer.teacherPoints===null?answer.maxPoints:0),0));
     return { ...attempt, maxScore:pendingAiCount?gradedMaxScore:attempt.maxScore, pendingAiCount, gradedMaxScore, duplicateNameWarning: Boolean(attempt.duplicateNameWarning), answers };
   }
 
