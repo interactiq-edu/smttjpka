@@ -305,7 +305,7 @@ export function App() {
     })();
     return()=>{active=false;};
   }, [apiBase, request]);
-  useEffect(() => { joined.current = false; setSelected(null); setAttempt(null); setQuestions([]); setFlashcards([]); setError(''); if (joinCode) setView('home'); }, [joinCode]);
+  useEffect(() => { joined.current = false; setSelected(null); setAttempt(null); setQuestions([]); setFlashcards([]); setError(''); if (joinCode){sessionStorage.setItem('interactiq_last_join_code',joinCode);setView('home');} }, [joinCode]);
   useEffect(() => {
     if (!joinCode || joinInfoCode!==joinCode || !joinInfo || !session?.roles.includes('STUDENT') || session.tenant.slug===joinInfo.tenantSlug) return;
     // A student session is tenant-scoped. A link from another tenant must ask
@@ -394,6 +394,10 @@ export function App() {
     setCsrf(''); setSession(null); setResources([]); setDashboard(null); setSelected(null); setQuestions([]); setReports([]); setMusicTracks([]); navigateView('home',true); setError(''); setIntroAudience(null);
   };
   const signOut = () => setIntroAudience('SIGNOUT');
+  useEffect(() => {
+    if (!session?.roles.includes('STUDENT') || joinCode) return;
+    void finishSignOut();
+  }, [session, joinCode]);
   const refreshReports = async () => { setBusy('reports');setError(''); try { const [reportData,usage]=await Promise.all([request<ResourceReport[]>('/api/v1/reports'),request<StorageUsage>('/api/v1/storage/usage')]);setReports(reportData);setStorageUsage(usage);setError(''); } catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to load reports.'); } finally { setBusy(''); } };
   const loadReports = async () => { navigateView('reports'); await refreshReports(); };
   const openEditor = async (id: string) => { setBusy('editor'); setError(''); try { const detail = await request<LearningResourceDetail>(`/api/v1/resources/${id}`); setSelected(detail);
@@ -483,7 +487,8 @@ export function App() {
   // session must never leak the teacher dashboard into that URL.
   if (joinCode && !session.roles.includes('STUDENT')) return <LoginScreen adminLogin={adminLogin} authNotice={authNotice} busy={busy} error={error} forgotPassword={false} googleLogin={googleLogin} joinCode={joinCode} joinInfo={joinInfo} onBack={() => openAuthRoute('')} onForgot={() => openAuthRoute('forgot-password')} onRequestReset={requestPasswordReset} status={status} />;
   if (session.roles.includes('STUDENT') && joinInfo?.accessStartsAt && Date.parse(joinInfo.accessStartsAt) > now) return <CountdownScreen startsAt={joinInfo.accessStartsAt} title={joinInfo.title} />;
-  if (session.roles.includes('STUDENT') && view !== 'player') return <div className="login-page"><div className="login-card"><h1>{error ? 'Activity unavailable' : 'Opening activity…'}</h1><p>{error || 'Please wait while InteractIQ prepares your activity.'}</p></div></div>;
+  if (session.roles.includes('STUDENT') && view !== 'player' && !joinCode) return <div className="login-page"><div className="login-card"><p className="eyebrow">Administrator access</p><h1>Opening administrator sign in…</h1><p>The previous student test session is being closed securely.</p></div></div>;
+  if (session.roles.includes('STUDENT') && view !== 'player') return <div className="login-page"><div className="login-card"><h1>{error ? 'Activity unavailable' : 'Opening activity…'}</h1><p>{error || 'Please wait while InteractIQ prepares your activity.'}</p>{error&&<button className="primary-action primary-action--dark" onClick={signOut}>Sign out</button>}</div></div>;
   if (view === 'player' && selected) {
     if (selected.type === 'FLASHCARD_SET') return <FlashcardPlayer cards={flashcards} resource={selected} />;
     if (selected.type === 'ASSESSMENT' && attempt) return <AssignmentPlayer apiBase={apiBase} attempt={attempt} busy={busy === 'assignment' || busy === 'identity'} error={error} onIdentify={identifyStudent} onSubmit={submitAssignment} resource={selected} />;
