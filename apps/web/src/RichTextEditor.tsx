@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { Mark, Node } from '@tiptap/core';
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { Extension, Mark, Node } from '@tiptap/core';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
@@ -34,6 +34,26 @@ const Subscript = Mark.create({
   renderHTML: () => ['sub', 0],
 });
 
+const FontSize = Extension.create({
+  name: 'fontSize',
+  addGlobalAttributes: () => [{
+    types: ['textStyle'],
+    attributes: {
+      fontSize: {
+        default: null,
+        parseHTML: (element) => {
+          const size = Number.parseInt(element.style.fontSize, 10);
+          return Number.isFinite(size) && size >= 6 && size <= 96 ? size : null;
+        },
+        renderHTML: (attributes) => attributes.fontSize ? { style: `font-size: ${attributes.fontSize}px` } : {},
+      },
+    },
+  }],
+});
+
+const officeFontSizes = [6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72, 96];
+type HistoryOverride = { canUndo: boolean; canRedo: boolean; undo: () => void; redo: () => void };
+
 const symbolGroups = [
   { label: 'Arithmetic', items: ['±','×','÷','·','−','√','∛','∞','%'] },
   { label: 'Relations', items: ['=','≠','≈','≡','<','>','≤','≥','∝'] },
@@ -50,7 +70,7 @@ const equationGroups = [
   { label: 'Common engineering', items: ['F = ma','V = IR','P = VI','σ = P/A','v = u + at','Q = mcΔT'] },
 ];
 
-export function RichTextEditor({ value, onChange, onUploadImage, mode = 'full', label = 'Resource content editor' }: { value: RichTextDocument; onChange: (document: RichTextDocument) => void; onUploadImage?: (file: File) => Promise<string>; mode?: 'full' | 'math'; label?: string }) {
+export function RichTextEditor({ value, onChange, onUploadImage, mode = 'full', label = 'Resource content editor', contentOverlay, historyOverride }: { value: RichTextDocument; onChange: (document: RichTextDocument) => void; onUploadImage?: (file: File) => Promise<string>; mode?: 'full' | 'math'; label?: string; contentOverlay?: ReactNode; historyOverride?: HistoryOverride }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [imageError, setImageError] = useState('');
   const [picker, setPicker] = useState<'symbol' | 'equation' | null>(null);
@@ -60,6 +80,7 @@ export function RichTextEditor({ value, onChange, onUploadImage, mode = 'full', 
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Underline,
       TextStyle,
+      FontSize,
       Color,
       Highlight.configure({ multicolor: true }),
       Superscript,
@@ -98,11 +119,15 @@ export function RichTextEditor({ value, onChange, onUploadImage, mode = 'full', 
     } catch (error) { setImageError(error instanceof Error ? error.message : 'Unable to upload this image.'); }
   };
   const insertText = (text: string) => { editor.chain().focus().insertContent(text).run(); setPicker(null); };
+  const fontSize = String(editor.getAttributes('textStyle').fontSize ?? '');
+  const undo = historyOverride?.undo ?? (() => editor.chain().focus().undo().run());
+  const redo = historyOverride?.redo ?? (() => editor.chain().focus().redo().run());
 
   return <div className="rich-editor">
     <div className="rich-editor__toolbar" aria-label="Formatting toolbar">
-      <button aria-label="Undo" disabled={!editor.can().undo()} onClick={command(() => editor.chain().undo().run())} type="button">Undo</button>
-      <button aria-label="Redo" disabled={!editor.can().redo()} onClick={command(() => editor.chain().redo().run())} type="button">Redo</button>
+      <button aria-label="Undo" disabled={historyOverride ? !historyOverride.canUndo : !editor.can().undo()} onClick={undo} type="button">↶ Undo</button>
+      <button aria-label="Redo" disabled={historyOverride ? !historyOverride.canRedo : !editor.can().redo()} onClick={redo} type="button">↷ Redo</button>
+      <label className="toolbar-font-size" title="Font size"><span className="visually-hidden">Font size</span><select aria-label="Font size" value={fontSize} onChange={(event) => { const size = Number(event.target.value); if (size) editor.chain().focus().setMark('textStyle', { fontSize: size }).run(); else editor.chain().focus().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run(); }}><option value="">Size</option>{officeFontSizes.map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
       <span className="toolbar-divider" />
       <button className={editor.isActive('bold') ? 'is-active' : ''} onClick={command(() => editor.chain().toggleBold().run())} type="button"><strong>B</strong></button>
       <button className={editor.isActive('italic') ? 'is-active' : ''} onClick={command(() => editor.chain().toggleItalic().run())} type="button"><em>I</em></button>
@@ -120,7 +145,7 @@ export function RichTextEditor({ value, onChange, onUploadImage, mode = 'full', 
     </div>
     <input accept="image/png,image/jpeg,image/webp,image/gif" aria-label="Upload image" className="visually-hidden" onChange={addImage} ref={inputRef} type="file" />
     {imageError && <p className="message message--error">{imageError}</p>}
-    <EditorContent editor={editor} />
+    <div className="rich-editor__surface"><EditorContent editor={editor} />{contentOverlay}</div>
     {picker && <div className="math-picker-backdrop" role="presentation" onMouseDown={() => setPicker(null)}><section aria-modal="true" className="math-picker" onMouseDown={(event) => event.stopPropagation()} role="dialog"><button aria-label="Close" className="math-picker__close" onClick={() => setPicker(null)} type="button">×</button><p className="eyebrow">{picker === 'symbol' ? 'Insert symbol' : 'Equation editor'}</p><h3>{picker === 'symbol' ? 'Choose a standard mathematical symbol' : 'Choose or type an equation'}</h3><p className="muted">Symbols use standard Unicode mathematical notation and remain readable across modern devices.</p><div className="math-picker__groups">{(picker === 'symbol' ? symbolGroups : equationGroups).map((group) => <section key={group.label}><h4>{group.label}</h4><div className="math-picker__grid">{group.items.map((item) => <button key={item} onClick={() => insertText(item)} type="button">{item}</button>)}</div></section>)}</div>{picker === 'equation' && <div className="math-picker__custom"><label>Custom equation<input autoFocus placeholder="e.g. F = ma or σ = P/A" value={equation} onChange={(event) => setEquation(event.target.value)} /></label><button className="primary-action primary-action--dark" disabled={!equation.trim()} onClick={() => { insertText(equation.trim()); setEquation(''); }} type="button">Insert equation</button></div>}</section></div>}
   </div>;
 }
