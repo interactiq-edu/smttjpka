@@ -85,6 +85,19 @@ describe('human-readable review answers', () => {
     expect(displayAnswer('{"x":0.21,"y":0.35}',hotspot)).toBe('Selected point: 21% across, 35% down');
   });
 
+  it('grades visible hotspot choices by their teacher-defined status', () => {
+    const question: LearningQuestion = { ...baseQuestion, type:'HOTSPOT', options:[], acceptedAnswers:[], interaction:{kind:'hotspot',imageUrl:'image.png',shape:'point',regions:[{id:'correct-area',points:[{x:.2,y:.3}],isCorrect:true},{id:'distractor',points:[{x:.7,y:.6}],isCorrect:false}]} };
+    expect(gradeAnswer(question,'correct-area')).toEqual({correct:true,points:2});
+    expect(gradeAnswer(question,'distractor')).toEqual({correct:false,points:0});
+    expect(displayAnswer('distractor',question)).toBe('Hotspot 2');
+  });
+
+  it('keeps legacy coordinate hotspot attempts gradeable', () => {
+    const question: LearningQuestion = { ...baseQuestion, type:'HOTSPOT', options:[], acceptedAnswers:[], interaction:{kind:'hotspot',imageUrl:'image.png',shape:'rectangle',regions:[{id:'correct-area',points:[{x:.1,y:.1},{x:.3,y:.3}]},{id:'wrong-area',points:[{x:.6,y:.6},{x:.8,y:.8}],isCorrect:false}]} };
+    expect(gradeAnswer(question,'{"x":0.2,"y":0.2}')).toEqual({correct:true,points:2});
+    expect(gradeAnswer(question,'{"x":0.7,"y":0.7}')).toEqual({correct:false,points:0});
+  });
+
   it('renders structured typed and handwritten Math Response work for teacher review', () => {
     const question:LearningQuestion={...baseQuestion,type:'MATH_RESPONSE',points:4,options:[],acceptedAnswers:[],interaction:{kind:'math_response',calculator:true,handwriting:true,parts:[{id:'formula',label:'Formula',enabled:true,marks:1,scheme:'F = ma'},{id:'method',label:'Method calculation',enabled:true,marks:2,scheme:'Show substitution'},{id:'answer',label:'Final answer',enabled:true,marks:1,scheme:'10 N'}]}};
     const value=JSON.stringify({version:2,parts:{formula:{text:'F = ma',pages:[]},method:{text:'F = 2 × 5',pages:['data:image/jpeg;base64,abc']},answer:{text:'10 N',pages:[]}}});

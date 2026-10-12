@@ -136,6 +136,12 @@ const parseInteraction = (value: unknown, type: QuestionType): QuestionInteracti
   if (type === 'LABELLING' || type === 'HOTSPOT') {
     const targets = type === 'LABELLING' ? interaction.labels : interaction.regions;
     if (typeof interaction.imageUrl !== 'string' || !interaction.imageUrl || !Array.isArray(targets) || targets.length < 1) throw new AuthError(400, 'VALIDATION_ERROR', 'Upload an image and add at least one target.');
+    if(type==='HOTSPOT'){
+      const regions=interaction.regions as Array<Record<string,unknown>>;
+      if(regions.length>20)throw new AuthError(400,'VALIDATION_ERROR','Hotspot supports up to 20 answer choices.');
+      if(regions.some((region)=>region.isCorrect!==undefined&&typeof region.isCorrect!=='boolean'))throw new AuthError(400,'VALIDATION_ERROR','Every hotspot choice must have a valid Correct or Incorrect status.');
+      if(!regions.some((region)=>region.isCorrect!==false))throw new AuthError(400,'VALIDATION_ERROR','Set at least one hotspot choice as Correct.');
+    }
   }
   return value as QuestionInteraction;
 };

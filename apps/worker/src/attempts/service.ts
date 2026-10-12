@@ -47,6 +47,8 @@ export const displayAnswer = (value: string | string[], question: LearningQuesti
   }
   if (question.interaction?.kind === 'hotspot') {
     const rendered = (Array.isArray(value) ? value[0] : value) ?? '';
+    const selectedIndex=question.interaction.regions.findIndex((region)=>region.id===rendered);
+    if(selectedIndex>=0)return `Hotspot ${selectedIndex+1}`;
     try { const point=JSON.parse(rendered) as {x?:number;y?:number}; if(typeof point.x==='number'&&typeof point.y==='number') return `Selected point: ${Math.round(point.x*100)}% across, ${Math.round(point.y*100)}% down`; } catch {}
     return 'Image area selected';
   }
@@ -64,6 +66,7 @@ const correctAnswer = (question: LearningQuestion): string | string[] | null => 
   if (question.interaction?.kind === 'categorize') return question.interaction.categories.flatMap((category) => category.items.map((item) => `${visualLabel(item.text,item.imageUrl)} → ${category.name}`));
   if (question.interaction?.kind === 'match') return question.interaction.pairs.map((pair) => `${visualLabel(pair.prompt,pair.promptImageUrl)} → ${visualLabel(pair.response,pair.responseImageUrl)}`);
   if (question.interaction?.kind === 'match_table_grid') { const grid=question.interaction; return grid.correctCells.map((cell) => { const [rowId,columnId]=cell.split(':'); return `${grid.rows.find((row)=>row.id===rowId)?.text ?? rowId} → ${grid.columns.find((column)=>column.id===columnId)?.text ?? columnId}`; }); }
+  if(question.interaction?.kind==='hotspot')return question.interaction.regions.flatMap((region,index)=>region.isCorrect!==false?[`Hotspot ${index+1}`]:[]);
   if(question.interaction?.kind==='math_response'&&question.interaction.parts?.length)return question.interaction.parts.filter((part)=>part.enabled).map((part)=>`${part.label} (${part.marks}): ${part.scheme}`);
   if (question.type !== 'OPEN_ENDED' && question.acceptedAnswers.length) return question.acceptedAnswers;
   return null;

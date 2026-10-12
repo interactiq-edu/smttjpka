@@ -53,6 +53,18 @@ describe('question registry', () => {
       .toMatchObject({ type: 'LABELLING', interaction: { kind: 'labelling' } });
   });
 
+  it('accepts hotspot choices with correct and incorrect statuses', () => {
+    const interaction={kind:'hotspot',imageUrl:'https://example.com/diagram.jpg',shape:'point',regions:[
+      {id:'a',points:[{x:.2,y:.3}],isCorrect:true},{id:'b',points:[{x:.7,y:.6}],isCorrect:false},
+    ]};
+    expect(parseQuestionInput({type:'HOTSPOT',prompt,interaction})).toMatchObject({interaction:{kind:'hotspot',regions:[{isCorrect:true},{isCorrect:false}]}});
+  });
+
+  it('requires at least one correct hotspot choice', () => {
+    const interaction={kind:'hotspot',imageUrl:'https://example.com/diagram.jpg',shape:'point',regions:[{id:'a',points:[{x:.2,y:.3}],isCorrect:false}]};
+    expect(()=>parseQuestionInput({type:'HOTSPOT',prompt,interaction})).toThrow('at least one hotspot choice as Correct');
+  });
+
   it('accepts visual match pairs', () => {
     expect(parseQuestionInput({ type: 'MATCH', prompt, interaction: { kind: 'match', partialCredit: true, pairs: [{ id: 'a', prompt: 'Batu bata', response: 'Pembinaan' }, { id: 'b', prompt: 'Sayur', response: 'Makanan' }] } }))
       .toMatchObject({ type: 'MATCH', interaction: { kind: 'match', partialCredit: true } });
