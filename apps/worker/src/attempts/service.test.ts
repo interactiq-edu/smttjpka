@@ -92,6 +92,16 @@ describe('human-readable review answers', () => {
     expect(displayAnswer('distractor',question)).toBe('Hotspot 2');
   });
 
+  it('supports a teacher-defined number of required hotspot selections', () => {
+    const baseInteraction={kind:'hotspot' as const,imageUrl:'image.png',shape:'point' as const,regions:[{id:'correct-a',points:[{x:.2,y:.3}],isCorrect:true},{id:'correct-b',points:[{x:.5,y:.4}],isCorrect:true},{id:'wrong',points:[{x:.8,y:.7}],isCorrect:false}]};
+    const chooseOne:LearningQuestion={...baseQuestion,type:'HOTSPOT',options:[],acceptedAnswers:[],interaction:{...baseInteraction,requiredSelections:1}};
+    expect(gradeAnswer(chooseOne,['correct-b'])).toEqual({correct:true,points:2});
+    const chooseTwo:LearningQuestion={...chooseOne,interaction:{...baseInteraction,requiredSelections:2}};
+    expect(gradeAnswer(chooseTwo,['correct-a','correct-b'])).toEqual({correct:true,points:2});
+    expect(gradeAnswer(chooseTwo,['correct-a'])).toEqual({correct:false,points:0});
+    expect(gradeAnswer(chooseTwo,['correct-a','wrong'])).toEqual({correct:false,points:0});
+  });
+
   it('keeps legacy coordinate hotspot attempts gradeable', () => {
     const question: LearningQuestion = { ...baseQuestion, type:'HOTSPOT', options:[], acceptedAnswers:[], interaction:{kind:'hotspot',imageUrl:'image.png',shape:'rectangle',regions:[{id:'correct-area',points:[{x:.1,y:.1},{x:.3,y:.3}]},{id:'wrong-area',points:[{x:.6,y:.6},{x:.8,y:.8}],isCorrect:false}]} };
     expect(gradeAnswer(question,'{"x":0.2,"y":0.2}')).toEqual({correct:true,points:2});

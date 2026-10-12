@@ -46,10 +46,12 @@ export const displayAnswer = (value: string | string[], question: LearningQuesti
     return (Array.isArray(value) ? value : [value]).map((entry) => { const [labelId='',targetId='']=entry.split(':'); const label=labels.find((candidate)=>candidate.id===labelId); const target=labels.find((candidate)=>candidate.id===targetId); return `${label?.text ?? (labelId.startsWith('wrong-') ? 'Incorrect label' : 'Unknown label')} → ${target?.text ?? 'Unknown target'}`; });
   }
   if (question.interaction?.kind === 'hotspot') {
-    const rendered = (Array.isArray(value) ? value[0] : value) ?? '';
-    const selectedIndex=question.interaction.regions.findIndex((region)=>region.id===rendered);
-    if(selectedIndex>=0)return `Hotspot ${selectedIndex+1}`;
-    try { const point=JSON.parse(rendered) as {x?:number;y?:number}; if(typeof point.x==='number'&&typeof point.y==='number') return `Selected point: ${Math.round(point.x*100)}% across, ${Math.round(point.y*100)}% down`; } catch {}
+    const hotspot=question.interaction;
+    const rendered = Array.isArray(value) ? value : [value];
+    const selectedLabels=rendered.flatMap((entry)=>{const index=hotspot.regions.findIndex((region)=>region.id===entry);return index>=0?[`Hotspot ${index+1}`]:[];});
+    if(selectedLabels.length)return selectedLabels.length===1?selectedLabels[0]!:selectedLabels;
+    const legacy=rendered[0]??'';
+    try { const point=JSON.parse(legacy) as {x?:number;y?:number}; if(typeof point.x==='number'&&typeof point.y==='number') return `Selected point: ${Math.round(point.x*100)}% across, ${Math.round(point.y*100)}% down`; } catch {}
     return 'Image area selected';
   }
   const map = new Map(question.options.map((option) => [option.id, option.text]));
@@ -66,7 +68,7 @@ const correctAnswer = (question: LearningQuestion): string | string[] | null => 
   if (question.interaction?.kind === 'categorize') return question.interaction.categories.flatMap((category) => category.items.map((item) => `${visualLabel(item.text,item.imageUrl)} → ${category.name}`));
   if (question.interaction?.kind === 'match') return question.interaction.pairs.map((pair) => `${visualLabel(pair.prompt,pair.promptImageUrl)} → ${visualLabel(pair.response,pair.responseImageUrl)}`);
   if (question.interaction?.kind === 'match_table_grid') { const grid=question.interaction; return grid.correctCells.map((cell) => { const [rowId,columnId]=cell.split(':'); return `${grid.rows.find((row)=>row.id===rowId)?.text ?? rowId} → ${grid.columns.find((column)=>column.id===columnId)?.text ?? columnId}`; }); }
-  if(question.interaction?.kind==='hotspot')return question.interaction.regions.flatMap((region,index)=>region.isCorrect!==false?[`Hotspot ${index+1}`]:[]);
+  if(question.interaction?.kind==='hotspot'){const required=question.interaction.requiredSelections??1;const choices=question.interaction.regions.flatMap((region,index)=>region.isCorrect!==false?[`Hotspot ${index+1}`]:[]);return [`Choose ${required} of: ${choices.join(', ')}`];}
   if(question.interaction?.kind==='math_response'&&question.interaction.parts?.length)return question.interaction.parts.filter((part)=>part.enabled).map((part)=>`${part.label} (${part.marks}): ${part.scheme}`);
   if (question.type !== 'OPEN_ENDED' && question.acceptedAnswers.length) return question.acceptedAnswers;
   return null;

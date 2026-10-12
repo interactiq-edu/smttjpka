@@ -227,7 +227,7 @@ export type QuestionInteraction =
   | { kind: 'drag_drop'; template: string; blanks: Array<{ id: string; answer: string }>; distractors: string[] }
   | { kind: 'math_response'; calculator: boolean; handwriting?: boolean; parts?: Array<{ id: 'formula' | 'method' | 'answer'; label: string; enabled: boolean; marks: number; scheme: string; schemeDocument?: RichTextDocument }> }
   | { kind: 'labelling'; imageUrl: string; labels: Array<{ id: string; text: string; x: number; y: number }>; distractors: string[] }
-  | { kind: 'hotspot'; imageUrl: string; shape: 'point' | 'rectangle' | 'polygon'; regions: Array<{ id: string; points: Array<{ x: number; y: number }>; isCorrect?: boolean }> }
+  | { kind: 'hotspot'; imageUrl: string; shape: 'point' | 'rectangle' | 'polygon'; requiredSelections?: number; regions: Array<{ id: string; points: Array<{ x: number; y: number }>; isCorrect?: boolean }> }
   | { kind: 'reorder'; items: string[]; shufflePerStudent?: boolean }
   | { kind: 'categorize'; categories: Array<{ id: string; name: string; items: Array<{ id: string; text: string; imageUrl?: string | null }> }>; partialCredit: boolean }
   | { kind: 'match'; pairs: Array<{ id: string; prompt: string; response: string; promptImageUrl?: string | null; responseImageUrl?: string | null }>; partialCredit: boolean }
@@ -318,15 +318,16 @@ export const gradeQuestionAnswer = (question: LearningQuestion, value: string | 
     return { correct: hits === interaction.labels.length, points: question.points * hits / interaction.labels.length };
   }
   if (interaction?.kind === 'hotspot') {
-    const submitted = Array.isArray(value) ? value[0] ?? '' : value;
-    const selectedRegion = interaction.regions.find((region) => region.id === submitted);
-    if (selectedRegion) {
-      const correct = selectedRegion.isCorrect !== false;
+    const submittedValues = [...new Set(Array.isArray(value) ? value : [value])];
+    const selectedRegions = submittedValues.map((submitted) => interaction.regions.find((region) => region.id === submitted)).filter((region): region is typeof interaction.regions[number] => Boolean(region));
+    if (selectedRegions.length) {
+      const requiredSelections = interaction.requiredSelections ?? 1;
+      const correct = selectedRegions.length === requiredSelections && submittedValues.length === requiredSelections && selectedRegions.every((region) => region.isCorrect !== false);
       return { correct, points: correct ? question.points : 0 };
     }
     try {
       // Compatibility for attempts saved before hotspots became visible choices.
-      const point = JSON.parse(submitted) as { x: number; y: number };
+      const point = JSON.parse(submittedValues[0] ?? '') as { x: number; y: number };
       const inside = interaction.regions.filter((region) => region.isCorrect !== false).some((region) => {
         const xs = region.points.map((candidate) => candidate.x); const ys = region.points.map((candidate) => candidate.y);
         return point.x >= Math.min(...xs) && point.x <= Math.max(...xs) && point.y >= Math.min(...ys) && point.y <= Math.max(...ys);

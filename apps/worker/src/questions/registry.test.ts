@@ -65,6 +65,12 @@ describe('question registry', () => {
     expect(()=>parseQuestionInput({type:'HOTSPOT',prompt,interaction})).toThrow('at least one hotspot choice as Correct');
   });
 
+  it('validates the required hotspot answer count', () => {
+    const regions=[{id:'a',points:[{x:.2,y:.3}],isCorrect:true},{id:'b',points:[{x:.6,y:.7}],isCorrect:true}];
+    expect(parseQuestionInput({type:'HOTSPOT',prompt,interaction:{kind:'hotspot',imageUrl:'diagram.jpg',shape:'point',requiredSelections:2,regions}})).toMatchObject({interaction:{requiredSelections:2}});
+    expect(()=>parseQuestionInput({type:'HOTSPOT',prompt,interaction:{kind:'hotspot',imageUrl:'diagram.jpg',shape:'point',requiredSelections:3,regions}})).toThrow('cannot exceed the number of Correct choices');
+  });
+
   it('accepts visual match pairs', () => {
     expect(parseQuestionInput({ type: 'MATCH', prompt, interaction: { kind: 'match', partialCredit: true, pairs: [{ id: 'a', prompt: 'Batu bata', response: 'Pembinaan' }, { id: 'b', prompt: 'Sayur', response: 'Makanan' }] } }))
       .toMatchObject({ type: 'MATCH', interaction: { kind: 'match', partialCredit: true } });

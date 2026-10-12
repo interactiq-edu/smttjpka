@@ -138,9 +138,14 @@ const parseInteraction = (value: unknown, type: QuestionType): QuestionInteracti
     if (typeof interaction.imageUrl !== 'string' || !interaction.imageUrl || !Array.isArray(targets) || targets.length < 1) throw new AuthError(400, 'VALIDATION_ERROR', 'Upload an image and add at least one target.');
     if(type==='HOTSPOT'){
       const regions=interaction.regions as Array<Record<string,unknown>>;
+      const requiredSelections=interaction.requiredSelections===undefined?1:interaction.requiredSelections;
       if(regions.length>20)throw new AuthError(400,'VALIDATION_ERROR','Hotspot supports up to 20 answer choices.');
       if(regions.some((region)=>region.isCorrect!==undefined&&typeof region.isCorrect!=='boolean'))throw new AuthError(400,'VALIDATION_ERROR','Every hotspot choice must have a valid Correct or Incorrect status.');
-      if(!regions.some((region)=>region.isCorrect!==false))throw new AuthError(400,'VALIDATION_ERROR','Set at least one hotspot choice as Correct.');
+      const correctCount=regions.filter((region)=>region.isCorrect!==false).length;
+      if(!correctCount)throw new AuthError(400,'VALIDATION_ERROR','Set at least one hotspot choice as Correct.');
+      if(typeof requiredSelections!=='number'||!Number.isInteger(requiredSelections)||requiredSelections<1||requiredSelections>20)throw new AuthError(400,'VALIDATION_ERROR','Hotspot required answers must be a whole number between 1 and 20.');
+      if(requiredSelections>correctCount)throw new AuthError(400,'VALIDATION_ERROR','Hotspot required answers cannot exceed the number of Correct choices.');
+      interaction.requiredSelections=requiredSelections;
     }
   }
   return value as QuestionInteraction;
