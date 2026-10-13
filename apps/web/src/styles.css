@@ -96,6 +96,7 @@ h1, h2, h3, p { margin-top: 0; } h1 { margin-bottom: 0; font-size: 1.35rem; lett
 .rich-editor__toolbar button.toolbar-danger { color: #a52f29; }
 .setup-note { margin: 16px 0 0; padding: 12px; border-radius: 9px; background: #fff4d6; color: #72540b; font-size: .78rem; line-height: 1.5; }
 .student-login { display: grid; justify-items: center; margin-top: 26px; }
+.external-browser-notice { display: grid; gap: 12px; margin-top: 24px; padding: 22px; border: 1px solid #d9d3ff; border-radius: 16px; background: #f6f4ff; text-align: center; }.external-browser-notice__icon { display: grid; width: 48px; height: 48px; margin: 0 auto; place-items: center; border-radius: 14px; background: #6657ff; color: #fff; font-size: 1.55rem; font-weight: 900; }.external-browser-notice h2 { margin: 0; font-size: 1.35rem; }.external-browser-notice p { margin: 0 0 4px; color: #5d5666; line-height: 1.55; }.external-browser-notice small { color: #6d6675; line-height: 1.45; }.external-browser-copy { border: 1px solid #6657ff; background: #fff; color: #4337b7; }
 
 /* Student one-question experience */
 .student-shell { --theme-bg: linear-gradient(135deg,#e9e6ff,#bcd7ff 52%,#ffe0f2); --theme-ink:#181430; --theme-card:rgba(255,255,255,.9); --theme-accent:#6655ff; position: relative; min-height: 100vh; overflow: hidden; background: var(--theme-bg); color: var(--theme-ink); }
