@@ -8,6 +8,9 @@ import { ResourceService } from './resources/service';
 import { QuestionRepository } from './questions/repository';
 import { QuestionService } from './questions/service';
 import { AttemptService } from './attempts/service';
+import { verifyGoogleCredential } from './auth/google';
+import { constantTimeEqual } from './auth/crypto';
+import { openRedirectToken, sealRedirectToken } from './auth/redirect-token';
 
 export interface Env extends AuthEnvironment {
   APP_ENV: 'development' | 'staging' | 'production';
@@ -17,6 +20,7 @@ export interface Env extends AuthEnvironment {
   RESEND_API_KEY?: string;
   PASSWORD_RESET_FROM_EMAIL?: string;
   PASSWORD_RESET_APP_URL?: string;
+  STUDENT_APP_URL?: string;
   AI_GATEWAY_ID?: string;
   AI_GATEWAY_ACCOUNT_ID?: string;
   AI_GATEWAY_TOKEN?: string;
@@ -33,6 +37,22 @@ interface R2ObjectBody {
 
 interface WorkerExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
+}
+
+interface GoogleRedirectState {
+  kind: 'google-state';
+  joinCode: string;
+  expiresAt: number;
+  requestId: string;
+}
+
+interface GoogleRedirectExchange {
+  kind: 'google-exchange';
+  joinCode: string;
+  state: string;
+  sessionToken: string;
+  csrfToken: string;
+  expiresAt: number;
 }
 
 interface R2Bucket {
@@ -99,6 +119,18 @@ const errorResponse = (request: Request, env: Env, status: number, code: ApiErro
 );
 const sessionCookie = (env: Env, token: string, maxAge: number): string => `${cookieName(env)}=${token}; Path=/; HttpOnly; SameSite=${env.APP_ENV === 'production' ? 'None' : 'Lax'}; Max-Age=${maxAge}${env.APP_ENV === 'production' ? '; Secure' : ''}`;
 const clearSessionCookie = (env: Env): string => `${cookieName(env)}=; Path=/; HttpOnly; SameSite=${env.APP_ENV === 'production' ? 'None' : 'Lax'}; Max-Age=0${env.APP_ENV === 'production' ? '; Secure' : ''}`;
+
+const studentAppUrl = (env: Env): URL => {
+  const value = new URL(env.STUDENT_APP_URL ?? 'https://interactiq-edu.github.io/smttjpka/');
+  if (value.protocol !== 'https:' && value.hostname !== 'localhost') throw new AuthError(500, 'CONFIGURATION_ERROR', 'Student application URL is invalid.');
+  return value;
+};
+
+const redirectResponse = (location: string, cookie?: string): Response => {
+  const headers = new Headers({ location, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'content-security-policy': "default-src 'none'; frame-ancestors 'none'; base-uri 'none'", 'x-content-type-options': 'nosniff' });
+  if (cookie) headers.append('set-cookie', cookie);
+  return new Response(null, { status: 303, headers });
+};
 
 const parseJson = async (request: Request): Promise<unknown> => {
   if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) throw new AuthError(415, 'VALIDATION_ERROR', 'Content-Type must be application/json.');
@@ -351,6 +383,52 @@ export const app = {
         const result = await new PasswordResetService(env).confirmReset(await parseJson(request), clientIp(request));
         const response = json(request, env, { success: true, data: result });
         response.headers.append('set-cookie', clearSessionCookie(env));
+        return response;
+      }
+      if (request.method === 'POST' && url.pathname === '/api/v1/auth/google/redirect/config') {
+        requireAllowedBrowserOrigin(request, env);
+        if (!env.GOOGLE_CLIENT_ID || !env.RATE_LIMIT_PEPPER) throw new AuthError(500, 'CONFIGURATION_ERROR', 'Google authentication is not configured.');
+        const input = await parseJson(request) as { joinCode?: unknown };
+        const joinCode = typeof input.joinCode === 'string' ? input.joinCode.trim().toUpperCase() : '';
+        if (!/^[A-Z0-9]{8}$/.test(joinCode)) throw new AuthError(400, 'VALIDATION_ERROR', 'A valid activity code is required.');
+        const resource = await resourceRepository.findPublishedContextByShareCode(joinCode);
+        if (!resource) throw new AuthError(404, 'VALIDATION_ERROR', 'This activity is unavailable or no longer published.');
+        const state = await sealRedirectToken({ kind: 'google-state', joinCode, expiresAt: Date.now() + 10 * 60_000, requestId: crypto.randomUUID() } satisfies GoogleRedirectState, env.RATE_LIMIT_PEPPER);
+        return json(request, env, { success: true, data: { nonce: state, loginUri: `${url.origin}/api/v1/auth/google/redirect` } });
+      }
+      if (request.method === 'POST' && url.pathname === '/api/v1/auth/google/redirect') {
+        if (!env.GOOGLE_CLIENT_ID || !env.RATE_LIMIT_PEPPER) throw new AuthError(500, 'CONFIGURATION_ERROR', 'Google authentication is not configured.');
+        const form = await request.formData();
+        const credential = form.get('credential');
+        if (typeof credential !== 'string' || credential.length < 20 || credential.length > 16384) throw new AuthError(400, 'VALIDATION_ERROR', 'A valid Google credential is required.');
+        let identity;
+        try { identity = await verifyGoogleCredential(credential, env.GOOGLE_CLIENT_ID); }
+        catch { throw new AuthError(401, 'INVALID_CREDENTIALS', 'Invalid Google credential.'); }
+        if (!identity.nonce) throw new AuthError(401, 'INVALID_CREDENTIALS', 'Google sign-in state is missing.');
+        let state: GoogleRedirectState;
+        try { state = await openRedirectToken<GoogleRedirectState>(identity.nonce, env.RATE_LIMIT_PEPPER); }
+        catch { throw new AuthError(401, 'INVALID_CREDENTIALS', 'Google sign-in state is invalid.'); }
+        if (state.kind !== 'google-state' || state.expiresAt <= Date.now() || !/^[A-Z0-9]{8}$/.test(state.joinCode)) throw new AuthError(401, 'INVALID_CREDENTIALS', 'Google sign-in state has expired.');
+        const resource = await resourceRepository.findPublishedContextByShareCode(state.joinCode);
+        if (!resource) throw new AuthError(404, 'VALIDATION_ERROR', 'This activity is unavailable or no longer published.');
+        const session = await auth.loginGoogleIdentity(resource.tenantSlug, identity, clientIp(request));
+        const exchange = await sealRedirectToken({ kind: 'google-exchange', joinCode: state.joinCode, state: identity.nonce, sessionToken: session.sessionToken, csrfToken: session.csrfToken, expiresAt: Date.now() + 2 * 60_000 } satisfies GoogleRedirectExchange, env.RATE_LIMIT_PEPPER);
+        const appUrl = studentAppUrl(env);
+        appUrl.hash = `/join/${state.joinCode}?login_exchange=${encodeURIComponent(exchange)}&login_state=${encodeURIComponent(identity.nonce)}`;
+        return redirectResponse(appUrl.toString(), sessionCookie(env, session.sessionToken, sessionTtl(env)));
+      }
+      if (request.method === 'POST' && url.pathname === '/api/v1/auth/google/exchange') {
+        requireAllowedBrowserOrigin(request, env);
+        if (!env.RATE_LIMIT_PEPPER) throw new AuthError(500, 'CONFIGURATION_ERROR', 'Google authentication is not configured.');
+        const input = await parseJson(request) as { exchange?: unknown; state?: unknown };
+        if (typeof input.exchange !== 'string' || input.exchange.length > 20000 || typeof input.state !== 'string' || input.state.length > 12000) throw new AuthError(400, 'VALIDATION_ERROR', 'Google sign-in exchange is invalid.');
+        let exchange: GoogleRedirectExchange;
+        try { exchange = await openRedirectToken<GoogleRedirectExchange>(input.exchange, env.RATE_LIMIT_PEPPER); }
+        catch { throw new AuthError(401, 'INVALID_CREDENTIALS', 'Google sign-in exchange is invalid.'); }
+        if (exchange.kind !== 'google-exchange' || exchange.expiresAt <= Date.now() || !constantTimeEqual(exchange.state, input.state)) throw new AuthError(401, 'INVALID_CREDENTIALS', 'Google sign-in exchange has expired.');
+        const session = await auth.getSession(exchange.sessionToken);
+        const response = json(request, env, { success: true, data: { ...session, csrfToken: exchange.csrfToken, sessionToken: exchange.sessionToken } });
+        response.headers.append('set-cookie', sessionCookie(env, exchange.sessionToken, sessionTtl(env)));
         return response;
       }
       if (request.method === 'POST' && url.pathname === '/api/v1/media/images') {

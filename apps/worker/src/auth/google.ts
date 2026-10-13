@@ -10,6 +10,7 @@ interface GoogleTokenPayload {
   email?: string;
   email_verified?: boolean;
   name?: string;
+  nonce?: string;
 }
 
 interface GoogleTokenHeader {
@@ -25,6 +26,7 @@ export interface GoogleIdentity {
   subject: string;
   email: string | null;
   displayName: string | null;
+  nonce: string | null;
 }
 
 const decoder = new TextDecoder();
@@ -73,5 +75,5 @@ export const verifyGoogleCredential = async (credential: string, audience: strin
   }
   if (payload.email !== undefined && payload.email_verified !== true) throw new Error('Google email is not verified.');
 
-  return { subject: payload.sub, email: payload.email ?? null, displayName: payload.name ?? null };
+  return { subject: payload.sub, email: payload.email ?? null, displayName: payload.name ?? null, nonce: payload.nonce ?? null };
 };

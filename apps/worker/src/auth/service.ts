@@ -2,7 +2,7 @@ import type { AuthenticatedUser, AuthSessionData, PlatformRole } from '@interact
 import { TenantRepository } from '../db/tenant-repository';
 import type { D1Database } from '../db/types';
 import { randomToken, sha256, toSqliteTimestamp, verifyPbkdf2Password } from './crypto';
-import { verifyGoogleCredential } from './google';
+import { verifyGoogleCredential, type GoogleIdentity } from './google';
 import { AuthRepository } from './repository';
 
 export interface AuthEnvironment {
@@ -106,17 +106,20 @@ export class AuthService {
     const input = parseInput(body);
     const credential = requireText(input.credential, 'Google credential', 16384);
     if (!this.env.GOOGLE_CLIENT_ID) throw new AuthError(500, 'CONFIGURATION_ERROR', 'Google authentication is not configured.');
-    const scopeHash = await this.rateScope(`google:${input.tenantSlug}:${clientIp}`);
-    const lockedUntil = await this.auth.consumeRateLimit(scopeHash);
-    if (lockedUntil && Date.parse(`${lockedUntil.replace(' ', 'T')}Z`) > Date.now()) throw new AuthError(429, 'RATE_LIMITED', 'Too many login attempts. Try again later.');
-
-    let identity: { subject: string; email: string | null; displayName: string | null };
+    let identity: GoogleIdentity;
     try {
       identity = await verifyGoogleCredential(credential, this.env.GOOGLE_CLIENT_ID);
     } catch {
       throw new AuthError(401, 'INVALID_CREDENTIALS', 'Invalid Google credential.');
     }
-    const tenant = await this.tenants.findActiveBySlug(input.tenantSlug);
+    return this.loginGoogleIdentity(input.tenantSlug, identity, clientIp);
+  }
+
+  async loginGoogleIdentity(tenantSlug: string, identity: GoogleIdentity, clientIp: string): Promise<IssuedSession> {
+    const scopeHash = await this.rateScope(`google:${tenantSlug}:${clientIp}`);
+    const lockedUntil = await this.auth.consumeRateLimit(scopeHash);
+    if (lockedUntil && Date.parse(`${lockedUntil.replace(' ', 'T')}Z`) > Date.now()) throw new AuthError(429, 'RATE_LIMITED', 'Too many login attempts. Try again later.');
+    const tenant = await this.tenants.findActiveBySlug(tenantSlug);
     if (!tenant) {
       await this.auth.writeAuditLog({ id: crypto.randomUUID(), tenantId: null, actorUserId: null, action: 'auth.google_login_failed', metadata: {} });
       throw new AuthError(401, 'INVALID_CREDENTIALS', 'Unable to sign in.');

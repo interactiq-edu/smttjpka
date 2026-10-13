@@ -11,18 +11,7 @@ type AccessSettings = { attemptPolicy: AttemptPolicy; resultReleasePolicy: Resul
 type StorageUsage = { bytes: number; objects: number };
 type UploadedMedia = { key: string; url: string; name: string; size: number; contentType: string };
 type ExportRow = string[];
-type EmbeddedBrowser = { name: string; platform: 'ANDROID' | 'IOS' | 'OTHER' };
-const embeddedBrowser = (): EmbeddedBrowser | null => {
-  const userAgent = navigator.userAgent;
-  const platform: EmbeddedBrowser['platform'] = /Android/i.test(userAgent) ? 'ANDROID' : /iPad|iPhone|iPod/i.test(userAgent) ? 'IOS' : 'OTHER';
-  if (/WhatsApp/i.test(userAgent)) return { name: 'WhatsApp', platform };
-  if (/Telegram|TgBrowser/i.test(userAgent)) return { name: 'Telegram', platform };
-  if (/Instagram/i.test(userAgent)) return { name: 'Instagram', platform };
-  if (/FBAN|FBAV|FB_IAB/i.test(userAgent)) return { name: 'Facebook', platform };
-  const androidWebView = platform === 'ANDROID' && (/;\s*wv\)/i.test(userAgent) || /Version\/4\.0.*Chrome/i.test(userAgent));
-  const iosWebView = platform === 'IOS' && !/Safari\/|CriOS\/|FxiOS\/|EdgiOS\/|OPiOS\//i.test(userAgent);
-  return androidWebView || iosWebView ? { name: 'this app', platform } : null;
-};
+const isIosBrowser = (): boolean => /iPad|iPhone|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const optimiseImageForAi=async(file:File):Promise<File>=>{
   if(!file.type.startsWith('image/')||file.type==='image/gif')return file;
   try{const bitmap=await createImageBitmap(file);const scale=Math.min(1,1800/Math.max(bitmap.width,bitmap.height));if(scale===1&&file.size<900_000){bitmap.close();return file;}const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));const context=canvas.getContext('2d');if(!context){bitmap.close();return file;}context.fillStyle='#fff';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();const blob=await new Promise<Blob|null>((resolve)=>canvas.toBlob(resolve,'image/webp',.84));return blob?new File([blob],file.name.replace(/\.[^.]+$/,'.webp'),{type:'image/webp'}):file;}catch{return file;}
@@ -214,7 +203,11 @@ export function App() {
   const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
   const [routeLocation, setRouteLocation] = useState(() => `${window.location.pathname}${window.location.hash}`);
   const queryJoinCode = new URLSearchParams(window.location.search).get('join')?.toUpperCase() ?? null;
-  const joinCode = /(?:^|#)\/join\/([A-Z0-9]{8})$/i.exec(routeLocation)?.[1]?.toUpperCase() ?? (/^[A-Z0-9]{8}$/.test(queryJoinCode ?? '') ? queryJoinCode : null);
+  const joinRouteMatch = /(?:^|#)\/join\/([A-Z0-9]{8})(?:\?([^#]*))?$/i.exec(routeLocation);
+  const joinCode = joinRouteMatch?.[1]?.toUpperCase() ?? (/^[A-Z0-9]{8}$/.test(queryJoinCode ?? '') ? queryJoinCode : null);
+  const redirectParameters = new URLSearchParams(joinRouteMatch?.[2] ?? '');
+  const loginExchange = redirectParameters.get('login_exchange');
+  const loginState = redirectParameters.get('login_state');
   const resetTokenMatch = /#\/reset-password\?token=([^&]+)/.exec(routeLocation);
   let resetToken: string | null = null;
   try { resetToken = resetTokenMatch?.[1] ? decodeURIComponent(resetTokenMatch[1]) : null; } catch { resetToken = ''; }
@@ -295,6 +288,29 @@ export function App() {
   }, [joinCode, request]);
   useEffect(() => { if (!joinInfo?.accessStartsAt || Date.parse(joinInfo.accessStartsAt) <= Date.now()) return; const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, [joinInfo?.accessStartsAt]);
   useEffect(() => {
+    if (!loginExchange || !loginState || !joinCode) return;
+    let active = true;
+    const expectedState = sessionStorage.getItem('interactiq_google_redirect_state');
+    if (!expectedState || expectedState !== loginState) {
+      setError('Google sign-in could not be verified. Please tap Continue with Google again.');
+      return;
+    }
+    setBusy('google'); setError('');
+    void fetch(`${apiBase}/api/v1/auth/google/exchange`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ exchange: loginExchange, state: loginState }) })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => null) as ApiResponse<AuthSessionData & { csrfToken:string; sessionToken:string }> | null;
+        if (!payload?.success) throw new Error(payload && !payload.success ? payload.error.message : 'Google sign-in could not be completed.');
+        sessionStorage.removeItem('interactiq_google_redirect_state'); sessionStorage.removeItem('interactiq_signed_out');
+        sessionStorage.setItem('interactiq_csrf', payload.data.csrfToken); sessionStorage.setItem('interactiq_session', payload.data.sessionToken);
+        if (active) { setCsrf(payload.data.csrfToken); setSession(payload.data); setIntroAudience('STUDENT'); }
+        window.history.replaceState({ ...(window.history.state ?? {}), interactiqView: 'home' }, '', `${window.location.pathname}${window.location.search}#/join/${joinCode}`);
+        setRouteLocation(`${window.location.pathname}${window.location.hash}`);
+      })
+      .catch((caught) => { if (active) setError(caught instanceof Error ? caught.message : 'Google sign-in could not be completed.'); })
+      .finally(() => { if (active) setBusy(''); });
+    return () => { active = false; };
+  }, [apiBase, joinCode, loginExchange, loginState]);
+  useEffect(() => {
     let active=true;
     const storeSession=(data:AuthSessionData & { csrfToken:string; sessionToken:string })=>{
       sessionStorage.setItem('interactiq_csrf',data.csrfToken); sessionStorage.setItem('interactiq_session',data.sessionToken);
@@ -306,6 +322,7 @@ export function App() {
       if(!payload?.success)throw new Error(payload && !payload.success ? payload.error.message : 'Unable to restore the student session.');
       storeSession(payload.data);
     };
+    if(loginExchange){return()=>{active=false;};}
     if(sessionStorage.getItem('interactiq_signed_out')==='1'){setCsrf('');setSession(null);return()=>{active=false;};}
     void (async()=>{
       try {
@@ -319,7 +336,7 @@ export function App() {
       }
     })();
     return()=>{active=false;};
-  }, [apiBase, request]);
+  }, [apiBase, request, loginExchange]);
   useEffect(() => { joined.current = false; setSelected(null); setAttempt(null); setQuestions([]); setFlashcards([]); setError(''); if (joinCode){sessionStorage.setItem('interactiq_last_join_code',joinCode);setView('home');} }, [joinCode]);
   useEffect(() => {
     if (!joinCode || joinInfoCode!==joinCode || !joinInfo || !isStudentContext || !session || session.tenant.slug===joinInfo.tenantSlug) return;
@@ -497,10 +514,11 @@ export function App() {
 
   if (resetToken !== null) return <PasswordResetScreen busy={busy === 'reset-password'} error={error} onBack={() => openAuthRoute('')} onSubmit={confirmPasswordReset} />;
   if (introAudience) return <HelloIntro audience={introAudience} onComplete={() => introAudience === 'SIGNOUT' ? void finishSignOut() : setIntroAudience(null)} />;
-  if (!session) return <LoginScreen adminLogin={adminLogin} authNotice={authNotice} busy={busy} error={error} forgotPassword={forgotPasswordRoute} googleLogin={googleLogin} joinCode={joinCode} joinInfo={joinInfo} onBack={() => openAuthRoute('')} onForgot={() => openAuthRoute('forgot-password')} onRequestReset={requestPasswordReset} status={status} />;
+  if (loginExchange && !session && !error) return <div className="login-page"><div className="login-card"><h1>Completing Google sign-in…</h1><p>Please wait while InteractIQ opens your activity.</p></div></div>;
+  if (!session) return <LoginScreen adminLogin={adminLogin} apiBase={apiBase} authNotice={authNotice} busy={busy} error={error} forgotPassword={forgotPasswordRoute} googleLogin={googleLogin} joinCode={joinCode} joinInfo={joinInfo} onBack={() => openAuthRoute('')} onForgot={() => openAuthRoute('forgot-password')} onRequestReset={requestPasswordReset} status={status} />;
   // A public join link is always a student entry point. An existing teacher
   // session must never leak the teacher dashboard into that URL.
-  if (joinCode && !isStudentContext) return <LoginScreen adminLogin={adminLogin} authNotice={authNotice} busy={busy} error={error} forgotPassword={false} googleLogin={googleLogin} joinCode={joinCode} joinInfo={joinInfo} onBack={() => openAuthRoute('')} onForgot={() => openAuthRoute('forgot-password')} onRequestReset={requestPasswordReset} status={status} />;
+  if (joinCode && !isStudentContext) return <LoginScreen adminLogin={adminLogin} apiBase={apiBase} authNotice={authNotice} busy={busy} error={error} forgotPassword={false} googleLogin={googleLogin} joinCode={joinCode} joinInfo={joinInfo} onBack={() => openAuthRoute('')} onForgot={() => openAuthRoute('forgot-password')} onRequestReset={requestPasswordReset} status={status} />;
   if (isStudentContext && joinInfo?.accessStartsAt && Date.parse(joinInfo.accessStartsAt) > now) return <CountdownScreen startsAt={joinInfo.accessStartsAt} title={joinInfo.title} />;
   if (isStudentContext && view !== 'player' && !joinCode) return <div className="login-page"><div className="login-card"><p className="eyebrow">Administrator access</p><h1>Opening administrator sign in…</h1><p>The previous student test session is being closed securely.</p></div></div>;
   if (isStudentContext && view !== 'player') return <div className="login-page"><div className="login-card"><h1>{error ? 'Activity unavailable' : 'Opening activity…'}</h1><p>{error || 'Please wait while InteractIQ prepares your activity.'}</p>{error&&<button className="primary-action primary-action--dark" onClick={signOut}>Sign out</button>}</div></div>;
@@ -531,8 +549,9 @@ export function App() {
   </div>;
 }
 
-function LoginScreen({ adminLogin, authNotice, busy, error, forgotPassword, googleLogin, joinCode, joinInfo, onBack, onForgot, onRequestReset, status }: {
+function LoginScreen({ adminLogin, apiBase, authNotice, busy, error, forgotPassword, googleLogin, joinCode, joinInfo, onBack, onForgot, onRequestReset, status }: {
   adminLogin: (e: FormEvent<HTMLFormElement>) => void;
+  apiBase: string;
   authNotice: string;
   busy: string;
   error: string;
@@ -547,36 +566,38 @@ function LoginScreen({ adminLogin, authNotice, busy, error, forgotPassword, goog
 }) {
   const googleRef = useRef<HTMLDivElement>(null); const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
   const passwordResetEnabled = import.meta.env.DEV || import.meta.env.VITE_PASSWORD_RESET_ENABLED === 'true';
-  const browser = joinCode ? embeddedBrowser() : null;
-  const [copiedLink, setCopiedLink] = useState(false);
-  const activityUrl = window.location.href;
-  const copyActivityLink = async () => {
-    try {
-      await navigator.clipboard.writeText(activityUrl);
-      setCopiedLink(true);
-      window.setTimeout(() => setCopiedLink(false), 2500);
-    } catch {
-      window.prompt('Copy this activity link, then paste it in Safari or Chrome:', activityUrl);
-    }
-  };
-  const openInChrome = () => {
-    const url = new URL(activityUrl);
-    const fallback = encodeURIComponent(activityUrl);
-    const query = new URLSearchParams(url.search);
-    if (joinCode) query.set('join', joinCode);
-    const path = `${url.host}${url.pathname}${query.size ? `?${query.toString()}` : ''}`;
-    window.location.href = `intent://${path}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${fallback};end`;
-  };
+  const [googleSetupError, setGoogleSetupError] = useState('');
+  const googleInitialised = useRef(false);
   useEffect(() => {
-    if (!joinCode || !joinInfo || !clientId || !googleRef.current || browser) return;
-    const render = () => { const google = (window as unknown as { google?: { accounts: { id: { initialize(options: object): void; renderButton(element: HTMLElement, options: object): void } } } }).google; if (google && googleRef.current) { google.accounts.id.initialize({ client_id: clientId, callback: (value: { credential: string }) => googleLogin(value.credential) }); google.accounts.id.renderButton(googleRef.current, { theme: 'outline', size: 'large', width: 360, text: 'continue_with' }); } };
-    const existing = document.querySelector<HTMLScriptElement>('script[data-google-identity]'); if (existing) { render(); return; }
-    const script = document.createElement('script'); script.src = 'https://accounts.google.com/gsi/client'; script.async = true; script.dataset.googleIdentity = 'true'; script.onload = render; document.head.appendChild(script);
-  }, [joinCode, clientId, googleLogin, browser?.name]);
+    if (!joinCode || !joinInfo || !clientId || !googleRef.current || googleInitialised.current) return;
+    let active = true;
+    const render = async () => {
+      const google = (window as unknown as { google?: { accounts: { id: { initialize(options: object): void; renderButton(element: HTMLElement, options: object): void } } } }).google;
+      if (!google || !googleRef.current || !active || googleInitialised.current) return;
+      try {
+        let options: object = { client_id: clientId, callback: (value: { credential: string }) => googleLogin(value.credential), itp_support: true, use_fedcm_for_button: true };
+        if (isIosBrowser()) {
+          const response = await fetch(`${apiBase}/api/v1/auth/google/redirect/config`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ joinCode }) });
+          const payload = await response.json().catch(() => null) as ApiResponse<{ nonce:string; loginUri:string }> | null;
+          if (!payload?.success) throw new Error(payload && !payload.success ? payload.error.message : 'Unable to prepare Google sign-in.');
+          sessionStorage.setItem('interactiq_google_redirect_state', payload.data.nonce);
+          options = { client_id: clientId, ux_mode: 'redirect', login_uri: payload.data.loginUri, nonce: payload.data.nonce, itp_support: true };
+        }
+        if (!active || !googleRef.current) return;
+        google.accounts.id.initialize(options);
+        google.accounts.id.renderButton(googleRef.current, { theme: 'outline', size: 'large', width: 360, text: 'continue_with' });
+        googleInitialised.current = true;
+      } catch (caught) { if (active) setGoogleSetupError(caught instanceof Error ? caught.message : 'Unable to prepare Google sign-in.'); }
+    };
+    const existing = document.querySelector<HTMLScriptElement>('script[data-google-identity]');
+    if (existing) { if ((window as unknown as { google?: unknown }).google) void render(); else existing.addEventListener('load', render, { once: true }); }
+    else { const script = document.createElement('script'); script.src = 'https://accounts.google.com/gsi/client'; script.async = true; script.dataset.googleIdentity = 'true'; script.onload = () => void render(); document.head.appendChild(script); }
+    return () => { active = false; };
+  }, [apiBase, joinCode, joinInfo, clientId, googleLogin]);
   const heading = forgotPassword ? 'Forgot password' : joinInfo?.title ?? (joinCode ? `Join ${joinCode}` : 'Welcome back');
   return <div className={`login-page theme-${joinInfo?.themeId?.toLowerCase() ?? 'aurora'}`}><section className="login-card"><ProductBrand login />
     <p className="eyebrow">{forgotPassword ? 'Administrator recovery' : joinCode ? 'Student activity' : 'Administrator sign in'}</p><h1>{heading}</h1><p className="muted">{forgotPassword ? 'Enter the email address for your Admin account.' : joinInfo ? `${joinInfo.tenantName} · Sign in securely with Google.` : joinCode ? 'Checking your teacher’s link…' : 'Manage learning resources and student submissions.'}</p>
-    {error && <p className="message message--error" role="alert">{error}</p>}{authNotice && <p className="message message--success" role="status">{authNotice}</p>}{joinInfo?.accessStartsAt && Date.parse(joinInfo.accessStartsAt) > Date.now() && <Countdown startsAt={joinInfo.accessStartsAt} />}{joinCode && browser ? <section className="external-browser-notice" role="alert"><span className="external-browser-notice__icon">↗</span><h2>Open in Safari or Chrome</h2><p>Google sign-in may not work inside {browser.name}. Buka pautan aktiviti ini dalam browser utama untuk meneruskan.</p>{browser.platform === 'ANDROID' && <button className="primary-action primary-action--dark" type="button" onClick={openInChrome}>Open in Chrome</button>}<button className="primary-action external-browser-copy" type="button" onClick={() => void copyActivityLink()}>{copiedLink ? '✓ Link copied' : 'Copy activity link'}</button><small>{browser.platform === 'IOS' ? `Tap the Share or ••• menu in ${browser.name}, then choose “Open in Safari”.` : browser.platform === 'ANDROID' ? `If Chrome does not open, tap ••• in ${browser.name} and choose “Open in browser”.` : `Use the ••• menu in ${browser.name} and choose “Open in browser”.`}</small></section> : joinCode ? <div className="student-login"><div ref={googleRef} />{joinInfo?.accessStartsAt && Date.parse(joinInfo.accessStartsAt) > Date.now() && <p className="muted">Sign in now. This activity will open automatically when the countdown ends.</p>}{!clientId && <p className="setup-note">Google Sign-In needs VITE_GOOGLE_CLIENT_ID configuration before students can enter.</p>}{busy === 'google' && <p>Signing you in…</p>}</div> : forgotPassword ? <form onSubmit={onRequestReset}><label>Email Address<input name="email" type="email" autoComplete="email" maxLength={254} required /></label><button className="primary-action primary-action--dark" disabled={busy === 'forgot-password'}>{busy === 'forgot-password' ? 'Sending…' : 'Send Reset Link'}</button><button className="auth-link" type="button" onClick={onBack}>Back to sign in</button></form> : <form onSubmit={adminLogin}><label>Username<input name="username" autoComplete="username" required /></label><label>Password<input name="password" type="password" autoComplete="current-password" required /></label><button className="primary-action primary-action--dark" disabled={busy === 'login'}>{busy === 'login' ? 'Signing in…' : 'Sign in'}</button>{passwordResetEnabled && <button className="auth-link" type="button" onClick={onForgot}>Forgot Password?</button>}</form>}<p className="service-note">Service status: {status}</p></section></div>;
+    {error && <p className="message message--error" role="alert">{error}</p>}{googleSetupError && <p className="message message--error" role="alert">{googleSetupError}</p>}{authNotice && <p className="message message--success" role="status">{authNotice}</p>}{joinInfo?.accessStartsAt && Date.parse(joinInfo.accessStartsAt) > Date.now() && <Countdown startsAt={joinInfo.accessStartsAt} />}{joinCode ? <div className="student-login"><div ref={googleRef} />{joinInfo?.accessStartsAt && Date.parse(joinInfo.accessStartsAt) > Date.now() && <p className="muted">Sign in now. This activity will open automatically when the countdown ends.</p>}{!clientId && <p className="setup-note">Google Sign-In needs VITE_GOOGLE_CLIENT_ID configuration before students can enter.</p>}{busy === 'google' && <p>Signing you in…</p>}</div> : forgotPassword ? <form onSubmit={onRequestReset}><label>Email Address<input name="email" type="email" autoComplete="email" maxLength={254} required /></label><button className="primary-action primary-action--dark" disabled={busy === 'forgot-password'}>{busy === 'forgot-password' ? 'Sending…' : 'Send Reset Link'}</button><button className="auth-link" type="button" onClick={onBack}>Back to sign in</button></form> : <form onSubmit={adminLogin}><label>Username<input name="username" autoComplete="username" required /></label><label>Password<input name="password" type="password" autoComplete="current-password" required /></label><button className="primary-action primary-action--dark" disabled={busy === 'login'}>{busy === 'login' ? 'Signing in…' : 'Sign in'}</button>{passwordResetEnabled && <button className="auth-link" type="button" onClick={onForgot}>Forgot Password?</button>}</form>}<p className="service-note">Service status: {status}</p></section></div>;
 }
 
 function PasswordResetScreen({ busy, error, onBack, onSubmit }: { busy: boolean; error: string; onBack: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
