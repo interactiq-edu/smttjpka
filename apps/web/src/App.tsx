@@ -234,6 +234,7 @@ export function App() {
   const [deleteTarget, setDeleteTarget] = useState<LearningResourceSummary | null>(null);
   const [joinInfo, setJoinInfo] = useState<JoinInfo | null>(null);
   const [joinInfoCode, setJoinInfoCode] = useState<string | null>(null);
+  const [openingRetry, setOpeningRetry] = useState(0);
   const [reports, setReports] = useState<ResourceReport[]>([]);
   const [storageUsage, setStorageUsage] = useState<StorageUsage>({ bytes: 0, objects: 0 });
   const [storageInventory, setStorageInventory] = useState<StorageInventory | null>(null);
@@ -243,6 +244,7 @@ export function App() {
   const [review, setReview] = useState<AttemptReview | null>(null);
   const [themeSettings, setThemeSettings] = useState<TenantThemeSettings>({ defaultTheme: 'AURORA' });
   const [now, setNow] = useState(Date.now());
+  const accessIsPending=Boolean(joinInfo?.accessStartsAt&&Date.parse(joinInfo.accessStartsAt)>now);
   const joined = useRef(false);
   const studentDrawingPending=useRef(0);
   const studentDrawingVersion=useRef(0);
@@ -286,7 +288,12 @@ export function App() {
       .finally(()=>window.clearTimeout(timeout));
     return () => { active=false; window.clearTimeout(timeout); controller.abort(); };
   }, [joinCode, request]);
-  useEffect(() => { if (!joinInfo?.accessStartsAt || Date.parse(joinInfo.accessStartsAt) <= Date.now()) return; const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, [joinInfo?.accessStartsAt]);
+  useEffect(() => {
+    if (!joinInfo?.accessStartsAt || Date.parse(joinInfo.accessStartsAt)<=Date.now()) return;
+    const startsAt=Date.parse(joinInfo.accessStartsAt);
+    const timer=window.setInterval(()=>{const current=Date.now();setNow(current);if(current>=startsAt)window.clearInterval(timer);},1000);
+    return()=>window.clearInterval(timer);
+  },[joinInfo?.accessStartsAt]);
   useEffect(() => {
     if (!loginExchange || !loginState || !joinCode) return;
     let active = true;
@@ -357,8 +364,8 @@ export function App() {
     refresh(); const timer=window.setInterval(refresh,10000); return ()=>window.clearInterval(timer);
   }, [session, isStudentContext, view, request]);
   useEffect(() => {
-    if (!isStudentContext || !session || !csrf || !joinCode || !joinInfo || joinInfoCode!==joinCode || session.tenant.slug!==joinInfo.tenantSlug || joined.current || (joinInfo.accessStartsAt && Date.parse(joinInfo.accessStartsAt) > now)) return;
-    let active=true; joined.current = true;
+    if (!isStudentContext || !session || !csrf || !joinCode || !joinInfo || joinInfoCode!==joinCode || session.tenant.slug!==joinInfo.tenantSlug || joined.current || accessIsPending) return;
+    let active=true; let completed=false; joined.current = true;
     const controller=new AbortController(); const timeout=window.setTimeout(()=>controller.abort(),20000);
     void (async () => {
       try {
@@ -371,12 +378,31 @@ export function App() {
           setQuestions(quizQuestions); setAttempt(started);
           if (['PRESENTATION','INTERACTIVE_VIDEO'].includes(resource.type)) setLiveState(await request<LiveResourceState>(`/api/v1/resources/${resource.id}/live`,{signal:controller.signal}));
         }
-        if(active){setSelected(resource); navigateView('player',true);}
+        if(active){completed=true;setSelected(resource); navigateView('player',true);}
       } catch (caught) { if(active){joined.current = false; setError(caught instanceof DOMException && caught.name==='AbortError' ? 'This activity took too long to open. Please refresh the link and try again.' : caught instanceof Error ? caught.message : 'Unable to start this activity.');} }
       finally { window.clearTimeout(timeout); }
     })();
-    return ()=>{active=false;window.clearTimeout(timeout);controller.abort();};
-  }, [session, isStudentContext, csrf, joinCode, joinInfo, joinInfoCode, now, request, navigateView]);
+    return ()=>{active=false;if(!completed)joined.current=false;window.clearTimeout(timeout);controller.abort();};
+  }, [session?.tenant.slug, isStudentContext, csrf, joinCode, joinInfo, joinInfoCode, accessIsPending, openingRetry, request, navigateView]);
+  useEffect(() => {
+    if (!isStudentContext || !joinCode || view==='player' || error || accessIsPending) return;
+    const timeout=window.setTimeout(()=>{
+      joined.current=false;
+      setError('This activity is taking longer than expected to open. Check your connection, then tap Try again.');
+    },30000);
+    return()=>window.clearTimeout(timeout);
+  },[isStudentContext,joinCode,view,error,accessIsPending,openingRetry]);
+
+  const retryOpeningActivity=()=>{
+    joined.current=false;
+    setError('');
+    setSelected(null);
+    setAttempt(null);
+    setQuestions([]);
+    setFlashcards([]);
+    setView('home');
+    setOpeningRetry((value)=>value+1);
+  };
 
   const adminLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setBusy('login'); setError(''); const form = new FormData(event.currentTarget);
@@ -519,9 +545,9 @@ export function App() {
   // A public join link is always a student entry point. An existing teacher
   // session must never leak the teacher dashboard into that URL.
   if (joinCode && !isStudentContext) return <LoginScreen adminLogin={adminLogin} apiBase={apiBase} authNotice={authNotice} busy={busy} error={error} forgotPassword={false} googleLogin={googleLogin} joinCode={joinCode} joinInfo={joinInfo} onBack={() => openAuthRoute('')} onForgot={() => openAuthRoute('forgot-password')} onRequestReset={requestPasswordReset} status={status} />;
-  if (isStudentContext && joinInfo?.accessStartsAt && Date.parse(joinInfo.accessStartsAt) > now) return <CountdownScreen startsAt={joinInfo.accessStartsAt} title={joinInfo.title} />;
+  if (isStudentContext && joinInfo?.accessStartsAt && accessIsPending) return <CountdownScreen startsAt={joinInfo.accessStartsAt} title={joinInfo.title} />;
   if (isStudentContext && view !== 'player' && !joinCode) return <div className="login-page"><div className="login-card"><p className="eyebrow">Administrator access</p><h1>Opening administrator sign in…</h1><p>The previous student test session is being closed securely.</p></div></div>;
-  if (isStudentContext && view !== 'player') return <div className="login-page"><div className="login-card"><h1>{error ? 'Activity unavailable' : 'Opening activity…'}</h1><p>{error || 'Please wait while InteractIQ prepares your activity.'}</p>{error&&<button className="primary-action primary-action--dark" onClick={signOut}>Sign out</button>}</div></div>;
+  if (isStudentContext && view !== 'player') return <div className="login-page"><div className="login-card"><h1>{error ? 'Activity unavailable' : 'Opening activity…'}</h1><p>{error || 'Please wait while InteractIQ prepares your activity.'}</p>{error&&<div className="dialog-actions"><button className="primary-action primary-action--dark" onClick={retryOpeningActivity}>Try again</button><button className="text-action" onClick={signOut}>Sign out</button></div>}</div></div>;
   if (view === 'player' && selected) {
     if (selected.type === 'FLASHCARD_SET') return <FlashcardPlayer cards={flashcards} resource={selected} />;
     if (selected.type === 'ASSESSMENT' && attempt) return <AssignmentPlayer apiBase={apiBase} attempt={attempt} busy={busy === 'assignment' || busy === 'identity'} error={error} onIdentify={identifyStudent} onSubmit={submitAssignment} resource={selected} />;
