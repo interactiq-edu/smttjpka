@@ -364,5 +364,5 @@ button,input,select,textarea{font:inherit}button{transition:transform .18s ease,
 @media(max-width:760px){.learning-phone{right:6%;bottom:3%;left:auto;width:76px;opacity:.95;filter:drop-shadow(0 12px 16px rgba(39,24,94,.32));transform:none}.learning-phone__frame{border-width:4px;border-radius:17px}.learning-phone__speaker{top:4px;height:2px}.learning-phone__home{bottom:4px;height:2px}}
 @media(max-width:440px){.learning-phone{right:4%;bottom:2%;width:66px}}
 
-/* Keep the supporting message readable while preserving the lavender scene beneath it. */
-.learning-landscape__copy p{width:fit-content;border:1px solid rgba(255,255,255,.38);border-radius:16px;padding:9px 15px;background:rgba(255,255,255,.49);box-shadow:0 10px 30px rgba(59,43,130,.1);backdrop-filter:blur(7px)}
+/* Hollow supporting message: outlined lettering with the scene visible through each glyph. */
+.learning-landscape__copy p{width:fit-content;border:0;border-radius:0;padding:0;background:transparent;color:transparent;font-weight:750;letter-spacing:.015em;-webkit-text-stroke:1px #403374;box-shadow:none;backdrop-filter:none;paint-order:stroke fill}
