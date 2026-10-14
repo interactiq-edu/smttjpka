@@ -117,7 +117,7 @@ const publicAsset = (path: string) => `${import.meta.env.BASE_URL}${path.replace
 function ProductBrand({ preview = false, login = false }: { preview?: boolean; login?:boolean }) {
   return <div className={`brand${login?' login-brand':''}`}>{login
     ? <img className="brand-wordmark" src={publicAsset('assets/interactiq-logo.png')} alt="InteractIQ" />
-    : <><img className="brand-symbol" src={publicAsset('assets/interactiq-mark.svg')} alt="" aria-hidden="true" /><span className="brand-copy"><b>InteractIQ{preview ? ' Preview' : ''}</b><small>By Cikgu Intan</small></span></>}
+    : <><img className="brand-symbol" src={publicAsset('assets/interactiq-symbol.png')} alt="" aria-hidden="true" /><span className="brand-copy"><b>InteractIQ{preview ? ' Preview' : ''}</b><small>By Cikgu Intan</small></span></>}
   </div>;
 }
 
