@@ -140,7 +140,7 @@ function EducationIcon({ name }: { name: EducationIconName }) {
 function AnimatedLearningLandscape() {
   return <aside className="learning-landscape" aria-label="InteractIQ learning inspiration">
     <div className="learning-sun" aria-hidden="true" />
-    <div className="learning-landscape__copy"><span><EducationIcon name="sparkles" /> Built for meaningful learning</span><h2>Learn. Create.<br/>Inspire.</h2><p>Turn every lesson into a confident, creative learning experience.</p></div>
+    <div className="learning-landscape__copy"><span><EducationIcon name="sparkles" /> Built for meaningful learning</span><h2>Learn. Create.<br/>Inspire.</h2></div>
     <div className="learning-phone" aria-hidden="true">
       <div className="learning-phone__frame">
         <span className="learning-phone__speaker" />
