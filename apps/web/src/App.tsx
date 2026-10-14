@@ -140,11 +140,11 @@ function EducationIcon({ name }: { name: EducationIconName }) {
 function AnimatedLearningLandscape() {
   return <aside className="learning-landscape" aria-label="InteractIQ learning inspiration">
     <div className="learning-sun" aria-hidden="true" />
-    <div className="learning-cloud learning-cloud--one" aria-hidden="true" />
-    <div className="learning-cloud learning-cloud--two" aria-hidden="true" />
     <div className="learning-landscape__copy"><span><EducationIcon name="sparkles" /> Built for meaningful learning</span><h2>Learn. Create.<br/>Inspire.</h2><p>Turn every lesson into a confident, creative learning experience.</p></div>
-    <div className="learning-orbit" aria-hidden="true"><span>∑</span><span>π</span><span>✦</span></div>
-    <div className="learning-book" aria-hidden="true"><i/><i/><b>IQ</b></div>
+    <div className="learning-books-3d" aria-hidden="true">
+      <div className="book-stack-3d"><i/><i/><i/></div>
+      <div className="open-book-3d"><span/><span/><b/></div>
+    </div>
     <div className="learning-hill learning-hill--back" aria-hidden="true" />
     <div className="learning-hill learning-hill--front" aria-hidden="true" />
     <div className="learning-grass" aria-hidden="true">{Array.from({length:18},(_,index)=><i key={index}/>)}</div>
