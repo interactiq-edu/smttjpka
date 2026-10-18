@@ -1,7 +1,7 @@
 import type { AttemptPolicy, CreateLearningResourceInput, Flashcard, LearningResourceDetail, LearningResourceSummary, LiveResourceState, LiveWhiteboardStroke, PublishedResource, QuizTheme, ResourceFolder, ResourceType, ResultReleasePolicy, RichTextDocument, RichTextMark, RichTextNode, TenantThemeSettings } from '@interactiq/contracts';
 import { AuthError } from '../auth/service';
 import { QuestionRepository } from '../questions/repository';
-import { ResourceRepository } from './repository';
+import { normalizeClassName, ResourceRepository } from './repository';
 
 const resourceTypes = new Set<ResourceType>(['QUIZ', 'ASSESSMENT', 'FLASHCARD_SET', 'PRESENTATION', 'INTERACTIVE_VIDEO']);
 const attemptPolicies = new Set<AttemptPolicy>(['ONCE_PER_EMAIL', 'MULTIPLE']);
@@ -199,10 +199,11 @@ export class ResourceService {
   }
 
   async updateAssignedClass(tenantId: string, resourceId: string, body: unknown): Promise<LearningResourceSummary> {
-    const raw = body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>).assignedClassName : null;
-    if (raw !== null && raw !== undefined && typeof raw !== 'string') throw new AuthError(400, 'VALIDATION_ERROR', 'Class name must be text.');
-    const assignedClassName = typeof raw === 'string' && raw.trim() ? raw.trim().slice(0, 80) : null;
-    const resource = await this.resources.updateAssignedClass(tenantId, resourceId, assignedClassName);
+    const input = body as {assignedClassNames?:unknown;assignedClassName?:unknown};
+    const raw=input?.assignedClassNames ?? (input?.assignedClassName ? [input.assignedClassName] : []);
+    if(!Array.isArray(raw)||raw.length>100||raw.some(n=>typeof n!=='string'||!n.trim()||n.length>80||!normalizeClassName(n)))throw new AuthError(400,'VALIDATION_ERROR','Choose up to 100 valid class names.');
+    const classes=[...new Set(raw.map(n=>normalizeClassName(n as string)))];
+    const resource = await this.resources.updateAssignedClass(tenantId, resourceId, classes);
     if (!resource) throw new AuthError(404, 'VALIDATION_ERROR', 'The requested resource does not exist.');
     return resource;
   }
@@ -229,6 +230,7 @@ export class ResourceService {
     if (!requestedTitle || requestedTitle.length > 160) throw new AuthError(400, 'VALIDATION_ERROR', 'A title between 1 and 160 characters is required.');
     const copy = await this.resources.create({ id: crypto.randomUUID(), tenantId, userId, title: requestedTitle,
       description: source.description, type: source.type, attemptPolicy: source.attemptPolicy, assignedClassName: source.assignedClassName });
+    await this.resources.updateAssignedClass(tenantId, copy.id, source.assignedClassNames ?? []);
     await this.resources.updateContent(tenantId, copy.id, source.content);
     await this.resources.updateTheme(tenantId, copy.id, source.themeId);
     await this.resources.updateDelivery(tenantId, copy.id, source.assetUrl, source.externalUrl);

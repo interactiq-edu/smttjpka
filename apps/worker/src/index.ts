@@ -154,7 +154,7 @@ const hasTrustedSignature = async (file: File, extension: string): Promise<boole
   if (extension === 'mp3') return new TextDecoder().decode(bytes.slice(0,3)) === 'ID3' || (bytes[0] === 0xff && ((bytes[1] ?? 0) & 0xe0) === 0xe0);
   if (extension === 'wav') return new TextDecoder().decode(bytes.slice(0,4)) === 'RIFF' && new TextDecoder().decode(bytes.slice(8,12)) === 'WAVE';
   if (extension === 'ogg') return new TextDecoder().decode(bytes.slice(0,4)) === 'OggS';
-  if (extension === 'm4a') return new TextDecoder().decode(bytes.slice(4,8)) === 'ftyp';
+  if (extension === 'm4a' || extension === 'mp4') return new TextDecoder().decode(bytes.slice(4,8)) === 'ftyp';
   return true;
 };
 
@@ -180,7 +180,7 @@ export const app = {
       const data: HealthData = { service: 'interactiq-api', environment: env.APP_ENV };
       return json(request, env, { success: true, data });
     }
-    const mediaRoute = /^\/api\/v1\/media\/([a-z0-9/_-]+\.(?:png|jpg|jpeg|webp|gif|ppt|pptx|pptm|doc|docx|docm|rtf|xls|xlsx|xlsm|csv|pub|vsd|vsdx|mdb|accdb|one|pdf|dwg|mp3|m4a|wav|ogg))$/i.exec(url.pathname);
+    const mediaRoute = /^\/api\/v1\/media\/([a-z0-9/_-]+\.(?:png|jpg|jpeg|webp|gif|ppt|pptx|pptm|doc|docx|docm|rtf|xls|xlsx|xlsm|csv|pub|vsd|vsdx|mdb|accdb|one|pdf|dwg|mp3|m4a|wav|ogg|mp4))$/i.exec(url.pathname);
     if ((request.method === 'GET' || request.method === 'HEAD') && mediaRoute) {
       if (!env.MEDIA) return errorResponse(request, env, 503, 'CONFIGURATION_ERROR', 'Image storage is not configured.');
       const key=mediaRoute[1]!;
@@ -464,12 +464,12 @@ export const app = {
         await auth.requireCsrf(session.token, csrfToken);
         if (!request.headers.get('content-type')?.toLowerCase().startsWith('multipart/form-data')) throw new AuthError(415, 'VALIDATION_ERROR', 'Upload a multipart presentation file.');
         const form = await request.formData(); const file = form.get('file');
-        const allowed = new Map([['application/vnd.openxmlformats-officedocument.presentationml.presentation','pptx'],['application/vnd.ms-powerpoint','ppt'],['application/pdf','pdf'],['application/msword','doc'],['application/vnd.openxmlformats-officedocument.wordprocessingml.document','docx'],['application/vnd.ms-excel','xls'],['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','xlsx']]);
-        const filenameExtension = file instanceof File ? /\.(pptx?|pdf|docx?|xlsx?)$/i.exec(file.name)?.[1]?.toLowerCase() : undefined;
+        const allowed = new Map([['application/vnd.openxmlformats-officedocument.presentationml.presentation','pptx'],['application/vnd.ms-powerpoint','ppt'],['video/mp4','mp4'],['application/pdf','pdf'],['application/msword','doc'],['application/vnd.openxmlformats-officedocument.wordprocessingml.document','docx'],['application/vnd.ms-excel','xls'],['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','xlsx']]);
+        const filenameExtension = file instanceof File ? /\.(pptx?|pdf|docx?|xlsx?|mp4)$/i.exec(file.name)?.[1]?.toLowerCase() : undefined;
         const extension = file instanceof File ? allowed.get(file.type) ?? filenameExtension : undefined;
-        if (!(file instanceof File) || !extension || file.size < 1 || file.size > 50_000_000) throw new AuthError(400, 'VALIDATION_ERROR', 'Use a PowerPoint, PDF, Word, or Excel file smaller than 50 MB.');
+        if (!(file instanceof File) || !extension || file.size < 1 || file.size > 50_000_000) throw new AuthError(400, 'VALIDATION_ERROR', 'Use a PowerPoint, PDF, Word, Excel, or MP4 file smaller than 50 MB.');
         if (!await hasTrustedSignature(file, extension)) throw new AuthError(400, 'VALIDATION_ERROR', 'The uploaded presentation content does not match its file type.');
-        const contentTypes:Record<string,string>={pdf:'application/pdf',ppt:'application/vnd.ms-powerpoint',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',doc:'application/msword',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',xls:'application/vnd.ms-excel',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'};
+        const contentTypes:Record<string,string>={mp4:'video/mp4',pdf:'application/pdf',ppt:'application/vnd.ms-powerpoint',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',doc:'application/msword',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',xls:'application/vnd.ms-excel',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'};
         const contentType = contentTypes[extension]!;
         const key = `tenants/${session.data.tenant.id}/presentations/${crypto.randomUUID()}.${extension}`;
         await env.MEDIA.put(key, await file.arrayBuffer(), { httpMetadata: { contentType } });
@@ -512,6 +512,10 @@ export const app = {
       if (request.method === 'GET' && /^\/api\/v1\/study-public\/[a-f0-9]{32}$/.test(url.pathname)) {
         return json(request,env,{success:true,data:await new StudyLibraryService(env.DB).publicTree(url.pathname.split('/').pop()!)});
       }
+      if(request.method==='GET'&&url.pathname==='/api/v1/student-roster') {
+        const session=await authenticatedSession(request,env,auth);
+        return json(request,env,{success:true,data:await new RosterService(env.DB).studentNames(session.data.tenant.id,session.data.user.id,url.searchParams.get('attempt')??'',url.searchParams.get('class')??'')});
+      }
       if (url.pathname === '/api/v1/rosters' || url.pathname === '/api/v1/rosters/classes' || url.pathname.startsWith('/api/v1/study-library')) {
         const session=await authenticatedSession(request,env,auth);
         requirePermission(toTenantContext(session.data),request.method==='GET'?'resource.read':request.method==='DELETE'?'resource.delete':'resource.update');
@@ -524,6 +528,7 @@ export const app = {
         let data:unknown;
         if(url.pathname==='/api/v1/rosters/classes'&&request.method==='GET')data=await rosters.classes(tenant);
         else if(url.pathname==='/api/v1/rosters'&&request.method==='GET')data=await rosters.get(tenant,url.searchParams.get('class')??'');
+        else if(url.pathname==='/api/v1/rosters'&&request.method==='DELETE')data=await rosters.remove(tenant,await parseJson(request));
         else if(url.pathname==='/api/v1/rosters'&&request.method==='PUT')data=await rosters.save(tenant,await parseJson(request));
         else if(url.pathname==='/api/v1/study-library'&&request.method==='GET')data=await library.list(tenant);
         else if(url.pathname==='/api/v1/study-library'&&request.method==='POST')data=await library.save(tenant,await parseJson(request));

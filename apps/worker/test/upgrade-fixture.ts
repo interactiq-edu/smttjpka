@@ -5,7 +5,7 @@ import type { D1Database,D1PreparedStatement } from '../src/db/types';
 export function database(upgrade=true) {
   const sqlite=new DatabaseSync(':memory:');
   for(const file of readdirSync(resolve('migrations')).sort()) {
-    if(file.startsWith('0028'))continue;
+    if(Number(file.slice(0,4))>=28)continue;
     sqlite.exec(readFileSync(resolve('migrations',file),'utf8'));
   }
   sqlite.exec(`INSERT INTO tenants(id,slug,name) VALUES('tenant','test-tenant','Test class'),('other','other','Other tenant');
@@ -16,7 +16,7 @@ export function database(upgrade=true) {
     INSERT INTO attempts(id,tenant_id,resource_id,user_id,status,score,max_score,student_full_name,student_class_name,submitted_at) VALUES('attempt','tenant','resource','student','COMPLETED',2,2,'Test Learner','5 PKA 1','2026-10-17 10:00:00');
     INSERT INTO attempt_answers(attempt_id,question_id,answer_json,awarded_points,teacher_points,teacher_feedback,ai_marking_status,ai_provider) VALUES('attempt','question','"a"',2,2,'Preserve review','MANUAL','CLOUDFLARE');
     INSERT INTO resource_live_states(resource_id,tenant_id,active_question_id) VALUES('resource','tenant','question');`);
-  const migrate=()=>{sqlite.exec('BEGIN;');sqlite.exec(readFileSync(resolve('migrations/0028_learning_upgrade.sql'),'utf8'));sqlite.exec('COMMIT;');};
+  const migrate=()=>{sqlite.exec('BEGIN;');for(const file of readdirSync(resolve('migrations')).sort().filter(f=>Number(f.slice(0,4))>=28))sqlite.exec(readFileSync(resolve('migrations',file),'utf8'));sqlite.exec('COMMIT;');};
   if(upgrade)migrate();
   const db:D1Database={
     prepare(query:string):D1PreparedStatement {let bindings:unknown[]=[];const statement:D1PreparedStatement={bind(...values){bindings=values;return statement;},async first<T>(){return sqlite.prepare(query).get(...bindings as never[]) as T??null;},async all<T>(){return {results:sqlite.prepare(query).all(...bindings as never[]) as T[],success:true,meta:{}};},async run(){const result=sqlite.prepare(query).run(...bindings as never[]);return {results:[],success:true,meta:{changes:Number(result.changes)}};}};return statement;},
@@ -24,4 +24,3 @@ export function database(upgrade=true) {
   };
   return {sqlite,db,migrate};
 }
-

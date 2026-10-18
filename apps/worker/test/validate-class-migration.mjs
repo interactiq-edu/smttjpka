@@ -1,0 +1,16 @@
+import {DatabaseSync} from 'node:sqlite';
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+const db=new DatabaseSync(':memory:');
+db.exec('PRAGMA foreign_keys=OFF;');
+db.exec(readFileSync(process.argv[2],'utf8'));
+db.exec('PRAGMA foreign_keys=ON;');
+const tables=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'").all();
+const quote=s=>'"'+s.replaceAll('"','""')+'"';
+const snapshots=tables.map(({name})=>{const columns=db.prepare('PRAGMA table_info('+quote(name)+')').all().map(c=>quote(c.name)).join(',');const query='SELECT '+columns+' FROM '+quote(name);return {name,query,rows:db.prepare(query).all()};});
+db.exec(readFileSync('migrations/0029_class_lists.sql','utf8'));
+for(const table of snapshots)assert.deepEqual(db.prepare(table.query).all(),table.rows,table.name+' changed unexpectedly');
+assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
+console.log('Migration 0029 verified: all existing columns and rows preserved in '+tables.length+' tables; foreign keys clean.');
+console.log('Existing attempts:',db.prepare('SELECT COUNT(*) n FROM attempts').get().n);
+db.close();

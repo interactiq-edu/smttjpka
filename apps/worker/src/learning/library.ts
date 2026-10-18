@@ -8,7 +8,7 @@ export const covers = ['books','science','globe','maths','art','graduation','pen
 export function safeLibraryUrl(value:string,tenant:string,cover=false):boolean {
   if (!value) return !cover;
   if(value.startsWith('/api/v1/media/tenants/'+tenant+'/') && !value.includes('..') && !value.includes('\\') && !/%2e|%2f|%5c/i.test(value))
-    return cover ? /\.(png|jpg|jpeg|webp|gif)(?:\?|$)/i.test(value) : /\.(pdf|pptx?|xlsx?|docx?|png|jpe?g|webp|gif)(?:\?|$)/i.test(value);
+    return cover ? /\.(png|jpg|jpeg|webp|gif|mp4)(?:\?|$)/i.test(value) : /\.(pdf|pptx?|xlsx?|docx?|png|jpe?g|webp|gif)(?:\?|$)/i.test(value);
   if(cover) return covers.includes(value);
   try {const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password&&!url.port&&hosts.some(host=>url.hostname===host||url.hostname.endsWith('.'+host));}catch{return false;}
 }

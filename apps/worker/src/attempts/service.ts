@@ -148,7 +148,8 @@ export class AttemptService {
       WHERE a.id = ? AND a.tenant_id = ? AND a.user_id = ? AND a.kicked_at IS NULL LIMIT 1`).bind(attemptId, tenantId, userId)
       .first<AttemptResult & { assignedClassName: string | null }>();
     if (!attempt || attempt.status !== 'IN_PROGRESS') throw new AuthError(404, 'VALIDATION_ERROR', 'The active student session does not exist.');
-    const className = attempt.assignedClassName?.trim() || normalizeClassName(identity.className);
+    const resource=await this.resources.findById(tenantId,attempt.resourceId);
+    const className = resolveStudentClass(resource?.assignedClassNames??[],identity.className);
     await this.db.prepare(`UPDATE attempts SET student_full_name = ?, student_class_name = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND tenant_id = ? AND user_id = ?`).bind(identity.fullName, className, attemptId, tenantId, userId).run();
     return { ...attempt, studentFullName: identity.fullName, studentClassName: className };
@@ -187,7 +188,7 @@ export class AttemptService {
       if (previous) throw new AuthError(409, 'VALIDATION_ERROR', 'Only one submission is allowed for each Google email.');
     }
     const submission = parseSubmission(body);
-    submission.className = resource?.assignedClassName?.trim() || normalizeClassName(submission.className);
+    submission.className = resolveStudentClass(resource?.assignedClassNames??[],submission.className);
     const questions = await this.questions.list(tenantId, attempt.resourceId);
     const questionMap = new Map(questions.map((question) => [question.id, question]));
     if (submission.answers.some((answer) => !questionMap.has(answer.questionId))) throw new AuthError(400, 'VALIDATION_ERROR', 'An answer does not belong to this quiz.');
@@ -290,7 +291,7 @@ export class AttemptService {
         ORDER BY a.submitted_at DESC`).bind(tenantId, resource.id).all<Record<string, unknown>>();
       const attempts = result.results.map((row) => ({ id: String(row.id), resourceId: resource.id, status: 'COMPLETED' as const,
         score: Number(row.score ?? 0), maxScore: Number(row.pendingAiCount??0)>0?Number(row.gradedMaxScore??0):Number(row.maxScore ?? 0), submittedAt: String(row.submittedAt),
-        studentFullName: row.studentFullName ? String(row.studentFullName) : null, studentClassName: row.studentClassName ? String(row.studentClassName) : null,
+        studentFullName: row.studentFullName ? String(row.studentFullName) : null, studentClassName: row.studentClassName ? normalizeClassName(String(row.studentClassName)) : null,
         studentEmail: row.studentEmail ? String(row.studentEmail) : null,
         submissionFileUrl: row.submissionFileUrl ? String(row.submissionFileUrl) : null, submissionFileName: row.submissionFileName ? String(row.submissionFileName) : null,
         submissionMimeType: row.submissionMimeType ? String(row.submissionMimeType) : null, submissionFileSize: row.submissionFileSize === null ? null : Number(row.submissionFileSize), submissionNotes: row.submissionNotes ? String(row.submissionNotes) : null,
@@ -501,4 +502,10 @@ export class AttemptService {
     const bytes=new Uint8Array(await new Response(object.body).arrayBuffer());let binary='';for(let offset=0;offset<bytes.length;offset+=0x8000)binary+=String.fromCharCode(...bytes.subarray(offset,offset+0x8000));
     const fallback=source.toLowerCase().endsWith('.webp')?'image/webp':source.toLowerCase().match(/\.jpe?g(?:$|\?)/)?'image/jpeg':'image/png';return `data:${object.httpMetadata?.contentType||fallback};base64,${btoa(binary)}`;
   }
+}
+
+export function resolveStudentClass(classes:string[],input:string):string {
+  const name=normalizeClassName(classes.length===1?classes[0]!:input);
+  if(!name||name==='No class'||(classes.length>1&&!classes.map(normalizeClassName).includes(name)))throw new AuthError(400,'VALIDATION_ERROR','Choose your assigned class before submitting.');
+  return name;
 }

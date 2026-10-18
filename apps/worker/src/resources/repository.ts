@@ -19,6 +19,7 @@ interface ResourceRow {
   musicTrackId: string | null;
   accessStartsAt: string | null;
   assignedClassName: string | null;
+  assignedClassesJson?: string;
   submissionDueAt: string | null;
   assignmentMaxScore: number;
   folderId: string | null;
@@ -30,11 +31,11 @@ const resourceSelect = `id, title, description, resource_type AS type, status, v
   share_code AS shareCode, published_at AS publishedAt, theme_id AS themeId, asset_url AS assetUrl,
   external_url AS externalUrl, attempt_policy AS attemptPolicy, result_release_policy AS resultReleasePolicy, access_starts_at AS accessStartsAt,
   replace_previous_attempts AS replacePreviousAttempts, music_track_id AS musicTrackId,
-  assigned_class_name AS assignedClassName, submission_due_at AS submissionDueAt,
+  (SELECT json_group_array(class_name) FROM resource_classes rc WHERE rc.resource_id=learning_resources.id) AS assignedClassesJson, assigned_class_name AS assignedClassName, submission_due_at AS submissionDueAt,
   assignment_max_score AS assignmentMaxScore, folder_id AS folderId,
   created_at AS createdAt, updated_at AS updatedAt`;
 
-const resourceSummary = (row: ResourceRow): LearningResourceSummary => ({ ...row, replacePreviousAttempts: Boolean(row.replacePreviousAttempts) });
+const resourceSummary = (row: ResourceRow): LearningResourceSummary => ({ ...row, assignedClassNames: JSON.parse(row.assignedClassesJson ?? '[]').length ? JSON.parse(row.assignedClassesJson!) : row.assignedClassName ? [normalizeClassName(row.assignedClassName)] : [], replacePreviousAttempts: Boolean(row.replacePreviousAttempts) });
 
 export class ResourceRepository {
   constructor(private readonly db: D1Database) {}
@@ -81,7 +82,7 @@ export class ResourceRepository {
       r.share_code AS shareCode, r.published_at AS publishedAt, r.theme_id AS themeId, r.asset_url AS assetUrl, r.external_url AS externalUrl,
       r.attempt_policy AS attemptPolicy, r.result_release_policy AS resultReleasePolicy, r.access_starts_at AS accessStartsAt,
       r.replace_previous_attempts AS replacePreviousAttempts, r.music_track_id AS musicTrackId,
-      r.assigned_class_name AS assignedClassName, r.submission_due_at AS submissionDueAt,
+      (SELECT json_group_array(class_name) FROM resource_classes rc WHERE rc.resource_id=r.id) AS assignedClassesJson, r.assigned_class_name AS assignedClassName, r.submission_due_at AS submissionDueAt,
       r.assignment_max_score AS assignmentMaxScore, r.folder_id AS folderId,
       r.created_at AS createdAt, r.updated_at AS updatedAt, r.content_json AS contentJson,
       r.tenant_id AS tenantId, t.slug AS tenantSlug, t.name AS tenantName
@@ -315,9 +316,13 @@ export class ResourceRepository {
     return this.findDetailById(tenantId, resourceId);
   }
 
-  async updateAssignedClass(tenantId: string, resourceId: string, assignedClassName: string | null): Promise<LearningResourceSummary | null> {
-    await this.db.prepare('UPDATE learning_resources SET assigned_class_name = ?, updated_at = CURRENT_TIMESTAMP WHERE tenant_id = ? AND id = ?')
-      .bind(assignedClassName, tenantId, resourceId).run();
+  async updateAssignedClass(tenantId: string, resourceId: string, classes: string[]): Promise<LearningResourceSummary | null> {
+    if(!await this.findById(tenantId,resourceId))return null;
+    await this.db.batch([
+      this.db.prepare('DELETE FROM resource_classes WHERE tenant_id=? AND resource_id=?').bind(tenantId,resourceId),
+      ...classes.map(name=>this.db.prepare('INSERT INTO resource_classes(tenant_id,resource_id,class_name) VALUES(?,?,?)').bind(tenantId,resourceId,name)),
+      this.db.prepare('UPDATE learning_resources SET assigned_class_name=?,updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND id=?').bind(classes.length===1?classes[0]:null,tenantId,resourceId),
+    ]);
     return this.findById(tenantId, resourceId);
   }
 

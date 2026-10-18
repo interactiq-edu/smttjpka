@@ -114,6 +114,7 @@ export interface LearningResourceSummary {
   musicTrackId?: string | null;
   accessStartsAt: string | null;
   assignedClassName: string | null;
+  assignedClassNames?: string[];
   submissionDueAt: string | null;
   assignmentMaxScore: number;
   folderId: string | null;

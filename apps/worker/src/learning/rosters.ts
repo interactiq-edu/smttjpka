@@ -1,7 +1,7 @@
 import type { ClassRoster, ClassRosterEntry } from '@interactiq/contracts';
 import { AuthError } from '../auth/service';
 import type { D1Database } from '../db/types';
-import { normalizeClassName } from '../resources/repository';
+import { ResourceRepository, normalizeClassName } from '../resources/repository';
 
 export const identityKey = (value:string) => value.trim().toLocaleLowerCase().replace(/\s+/g,' ');
 export function mergeRoster(entries:ClassRosterEntry[], submitted:ClassRosterEntry[], excluded:string[]=[]):ClassRosterEntry[] {
@@ -21,8 +21,31 @@ export function mergeRoster(entries:ClassRosterEntry[], submitted:ClassRosterEnt
 export class RosterService {
   constructor(private db:D1Database){}
   async classes(tenant:string):Promise<string[]> {
-    const rows=await this.db.prepare(`SELECT class_name AS name FROM class_rosters WHERE tenant_id=? UNION SELECT assigned_class_name AS name FROM learning_resources WHERE tenant_id=? AND assigned_class_name IS NOT NULL UNION SELECT student_class_name AS name FROM attempts WHERE tenant_id=? AND student_class_name IS NOT NULL`).bind(tenant,tenant,tenant).all<{name:string}>();
-    return [...new Set(rows.results.map(r=>normalizeClassName(r.name)).filter(Boolean))].sort();
+    const rows=await this.db.prepare(`SELECT class_name AS name FROM class_rosters WHERE tenant_id=? AND archived=0 UNION SELECT assigned_class_name AS name FROM learning_resources WHERE tenant_id=? AND assigned_class_name IS NOT NULL UNION SELECT student_class_name AS name FROM attempts WHERE tenant_id=? AND student_class_name IS NOT NULL UNION SELECT class_name AS name FROM resource_classes WHERE tenant_id=?`).bind(tenant,tenant,tenant,tenant).all<{name:string}>();
+    const archived=await this.db.prepare('SELECT class_name AS name FROM class_rosters WHERE tenant_id=? AND archived=1').bind(tenant).all<{name:string}>();
+    const hidden=new Set(archived.results.map(r=>normalizeClassName(r.name)));
+    return [...new Set(rows.results.map(r=>normalizeClassName(r.name)).filter(n=>n&&!hidden.has(n)))].sort();
+  }
+  async remove(tenant:string,body:unknown):Promise<string[]> {
+    const input=body as {className?:string;confirmation?:string};
+    if(typeof input?.className!=='string'||input.confirmation!==input.className)throw new AuthError(400,'VALIDATION_ERROR','Type the exact class name to delete it.');
+    const name=this.name(input.className);
+    await this.db.prepare('INSERT INTO class_rosters(tenant_id,class_name,archived) VALUES(?,?,1) ON CONFLICT(tenant_id,class_name) DO UPDATE SET archived=1,revision=revision+1').bind(tenant,name).run();
+    return this.classes(tenant);
+  }
+  async studentNames(tenant:string,userId:string,attemptId:string,className:string):Promise<string[]> {
+    const attempt=await this.db.prepare("SELECT resource_id AS resourceId FROM attempts WHERE id=? AND tenant_id=? AND user_id=? AND status='IN_PROGRESS' AND kicked_at IS NULL").bind(attemptId,tenant,userId).first<{resourceId:string}>();
+    if(!attempt)throw new AuthError(404,'VALIDATION_ERROR','Activity not found.');
+    const resource=await new ResourceRepository(this.db).findById(tenant,attempt.resourceId);
+    if(resource?.status!=='PUBLISHED')throw new AuthError(404,'VALIDATION_ERROR','Activity not available.');
+    const name=this.name(className);
+    const allowed=resource.assignedClassNames??[];
+    // Unassigned public activities accept free text but never reveal the school's full roster.
+    if(!allowed.length)return [];
+    if(!allowed.includes(name))throw new AuthError(403,'FORBIDDEN','Choose a class assigned by your teacher.');
+    const archived=await this.db.prepare('SELECT archived FROM class_rosters WHERE tenant_id=? AND class_name=?').bind(tenant,name).first<{archived:number}>();
+    if(archived?.archived)return [];
+    return [...new Set((await this.get(tenant,name)).entries.map(e=>e.name))].sort();
   }
   private name(name:string){const normalized=normalizeClassName(name);if(!name.trim()||name.length>80||!normalized)throw new AuthError(400,'VALIDATION_ERROR','Enter a class name (up to 80 characters).');return normalized;}
   async get(tenant:string,className:string):Promise<ClassRoster> {
@@ -48,7 +71,7 @@ export class RosterService {
     current.entries.filter(e=>input.deletedIds?.includes(e.id)&&!ids.has(e.id)).forEach(e=>excluded.add(identityKey(e.email)||identityKey(e.name)));
     entries.forEach(e=>excluded.delete(identityKey(e.email)||identityKey(e.name)));
     await this.db.prepare(`INSERT OR IGNORE INTO class_rosters(tenant_id,class_name) VALUES(?,?)`).bind(tenant,className).run();
-    const update=await this.db.prepare(`UPDATE class_rosters SET entries_json=?,excluded_json=?,revision=revision+1 WHERE tenant_id=? AND class_name=? AND revision=?`).bind(JSON.stringify(entries),JSON.stringify([...excluded]),tenant,className,input.revision).run();
+    const update=await this.db.prepare(`UPDATE class_rosters SET entries_json=?,excluded_json=?,archived=0,revision=revision+1 WHERE tenant_id=? AND class_name=? AND revision=?`).bind(JSON.stringify(entries),JSON.stringify([...excluded]),tenant,className,input.revision).run();
     if(Number(update.meta.changes)!==1)throw new AuthError(409,'VALIDATION_ERROR','This list changed in another tab. Reload before saving.');
     return this.get(tenant,className);
   }
