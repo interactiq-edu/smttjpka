@@ -171,6 +171,15 @@ export class ResourceService {
     return { deletedAttempts: await this.resources.deleteClassData(tenantId, className) };
   }
 
+  async deleteClassResourceData(tenantId: string, body: unknown): Promise<{ deletedAttempts: number }> {
+    const input = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
+    const className = input.className;
+    const resourceId = input.resourceId;
+    if (typeof className !== 'string' || !className.trim() || className.length > 80) throw new AuthError(400, 'VALIDATION_ERROR', 'Select a valid class.');
+    if (typeof resourceId !== 'string' || !/^[0-9a-f-]{36}$/i.test(resourceId)) throw new AuthError(400, 'VALIDATION_ERROR', 'Select a valid resource.');
+    return { deletedAttempts: await this.resources.deleteClassResourceData(tenantId, className, resourceId) };
+  }
+
   async updateTheme(tenantId: string, resourceId: string, body: unknown): Promise<LearningResourceSummary> {
     const themeId = body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>).themeId : null;
     if (typeof themeId !== 'string' || !isQuizTheme(themeId)) throw new AuthError(400, 'VALIDATION_ERROR', 'Select a valid quiz theme.');

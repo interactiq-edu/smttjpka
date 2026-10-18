@@ -134,18 +134,18 @@ export class ResourceRepository {
         WHERE tenant_id = ? AND revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP`)
       .bind(tenantId)
       .first<{ total: number }>();
-    const submissionRowsQuery = this.db.prepare(`SELECT a.id AS attemptId, a.student_full_name AS studentName,
+    const submissionRowsQuery = this.db.prepare(`SELECT a.id AS attemptId, a.resource_id AS resourceId, a.student_full_name AS studentName,
       a.student_class_name AS className, u.email AS studentEmail, r.title AS resourceTitle,
       r.resource_type AS resourceType, a.score, a.max_score AS maxScore, a.submitted_at AS submittedAt
       FROM attempts a JOIN users u ON u.id = a.user_id JOIN learning_resources r ON r.id = a.resource_id
       WHERE a.tenant_id = ? AND a.status = 'COMPLETED' AND r.resource_type <> 'ASSESSMENT' ORDER BY a.submitted_at DESC LIMIT 2000`)
       .bind(tenantId).all<Record<string, unknown>>();
     const wrongRowsQuery = this.db.prepare(`SELECT a.student_class_name AS className, q.id AS questionId,
-      q.prompt_json AS promptJson, r.title AS resourceTitle,
+      q.prompt_json AS promptJson, r.id AS resourceId, r.title AS resourceTitle,
       SUM(CASE WHEN COALESCE(aa.teacher_points, aa.ai_suggested_points, aa.awarded_points, 0) < q.points THEN 1 ELSE 0 END) AS incorrectCount,
       COUNT(*) AS answerCount FROM attempt_answers aa JOIN attempts a ON a.id = aa.attempt_id
       JOIN questions q ON q.id = aa.question_id JOIN learning_resources r ON r.id = a.resource_id
-      WHERE a.tenant_id = ? AND a.status = 'COMPLETED' GROUP BY a.student_class_name, q.id, r.title`)
+      WHERE a.tenant_id = ? AND a.status = 'COMPLETED' GROUP BY a.student_class_name, q.id, r.id, r.title`)
       .bind(tenantId).all<Record<string, unknown>>();
     const [counts, students, activeSessions, submissionRows, wrongRows] = await Promise.all([
       countsQuery, studentsQuery, activeSessionsQuery, submissionRowsQuery, wrongRowsQuery,
@@ -155,7 +155,7 @@ export class ResourceRepository {
       const className = normalizeClassName(String(row.className ?? 'No class'));
       const group = groups.get(className) ?? { className, students: [], wrong: [] };
       const score = Number(row.score ?? 0); const maxScore = Number(row.maxScore ?? 0);
-      group.students.push({ attemptId: String(row.attemptId), studentName: String(row.studentName ?? row.studentEmail ?? 'Student'),
+      group.students.push({ attemptId: String(row.attemptId), resourceId: String(row.resourceId), studentName: String(row.studentName ?? row.studentEmail ?? 'Student'),
         studentEmail: String(row.studentEmail ?? ''), resourceTitle: String(row.resourceTitle), resourceType: row.resourceType as ResourceType,
         score, maxScore, percentage: maxScore ? Math.round(score / maxScore * 100) : 0, submittedAt: String(row.submittedAt) });
       groups.set(className, group);
@@ -163,7 +163,7 @@ export class ResourceRepository {
     for (const row of wrongRows.results) {
       const className = normalizeClassName(String(row.className ?? 'No class')); const group = groups.get(className); if (!group) continue;
       const incorrectCount = Number(row.incorrectCount ?? 0); const answerCount = Number(row.answerCount ?? 0);
-      group.wrong.push({ questionId: String(row.questionId), prompt: richTextPlainText(String(row.promptJson)), resourceTitle: String(row.resourceTitle),
+      group.wrong.push({ questionId: String(row.questionId), resourceId: String(row.resourceId), prompt: richTextPlainText(String(row.promptJson)), resourceTitle: String(row.resourceTitle),
         incorrectCount, answerCount, incorrectPercentage: answerCount ? Math.round(incorrectCount / answerCount * 100) : 0 });
     }
     const classAnalytics = [...groups.values()].map((group) => ({ className: group.className,
@@ -288,6 +288,18 @@ export class ResourceRepository {
     await this.db.batch([
       this.db.prepare('DELETE FROM attempts WHERE tenant_id = ? AND UPPER(TRIM(student_class_name)) = ?').bind(tenantId, normalized),
       this.db.prepare('UPDATE learning_resources SET assigned_class_name = NULL, updated_at = CURRENT_TIMESTAMP WHERE tenant_id = ? AND UPPER(TRIM(assigned_class_name)) = ?').bind(tenantId, normalized),
+    ]);
+    return attempts.results.length;
+  }
+
+  async deleteClassResourceData(tenantId: string, className: string, resourceId: string): Promise<number> {
+    const normalized = normalizeClassName(className);
+    const attempts = await this.db.prepare('SELECT id FROM attempts WHERE tenant_id = ? AND resource_id = ? AND UPPER(TRIM(student_class_name)) = ?')
+      .bind(tenantId, resourceId, normalized).all<{ id: string }>();
+    await this.db.batch([
+      this.db.prepare('DELETE FROM attempts WHERE tenant_id = ? AND resource_id = ? AND UPPER(TRIM(student_class_name)) = ?').bind(tenantId, resourceId, normalized),
+      this.db.prepare('DELETE FROM resource_classes WHERE tenant_id = ? AND resource_id = ? AND UPPER(TRIM(class_name)) = ?').bind(tenantId, resourceId, normalized),
+      this.db.prepare('UPDATE learning_resources SET assigned_class_name = NULL, updated_at = CURRENT_TIMESTAMP WHERE tenant_id = ? AND id = ? AND UPPER(TRIM(assigned_class_name)) = ?').bind(tenantId, resourceId, normalized),
     ]);
     return attempts.results.length;
   }

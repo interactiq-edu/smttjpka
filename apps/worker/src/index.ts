@@ -253,7 +253,7 @@ export const app = {
         return json(request,env,{success:true,data:await organizer.createFolder(session.data.tenant.id,session.data.user.id,await parseJson(request))},{status:201});
       }
       const organizerFolderRoute=/^\/api\/v1\/organizer-folders\/([0-9a-f-]{36})$/i.exec(url.pathname);
-      if(request.method==='DELETE'&&organizerFolderRoute){const session=await authenticatedSession(request,env,auth);requirePermission(toTenantContext(session.data),'resource.update');const csrfToken=request.headers.get('x-csrf-token');if(!csrfToken)throw new AuthError(403,'FORBIDDEN','CSRF validation failed.');await auth.requireCsrf(session.token,csrfToken);await organizer.deleteFolder(session.data.tenant.id,organizerFolderRoute[1]!,await parseJson(request));return json(request,env,{success:true,data:{}});}
+      if(organizerFolderRoute&&['PATCH','DELETE'].includes(request.method)){const session=await authenticatedSession(request,env,auth);requirePermission(toTenantContext(session.data),'resource.update');const csrfToken=request.headers.get('x-csrf-token');if(!csrfToken)throw new AuthError(403,'FORBIDDEN','CSRF validation failed.');await auth.requireCsrf(session.token,csrfToken);if(request.method==='DELETE'){await organizer.deleteFolder(session.data.tenant.id,organizerFolderRoute[1]!,await parseJson(request));return json(request,env,{success:true,data:{}});}return json(request,env,{success:true,data:await organizer.renameFolder(session.data.tenant.id,organizerFolderRoute[1]!,await parseJson(request))});}
       if(request.method==='PATCH'&&url.pathname==='/api/v1/organizer-folders/assignment'){const session=await authenticatedSession(request,env,auth);requirePermission(toTenantContext(session.data),'resource.update');const csrfToken=request.headers.get('x-csrf-token');if(!csrfToken)throw new AuthError(403,'FORBIDDEN','CSRF validation failed.');await auth.requireCsrf(session.token,csrfToken);await organizer.moveResource(session.data.tenant.id,await parseJson(request));return json(request,env,{success:true,data:{}});}
       if(url.pathname==='/api/v1/planner/tasks'&&['GET','POST'].includes(request.method)){const session=await authenticatedSession(request,env,auth);requirePermission(toTenantContext(session.data),request.method==='GET'?'report.read':'resource.update');if(request.method==='GET')return json(request,env,{success:true,data:await organizer.tasks(session.data.tenant.id)});const csrfToken=request.headers.get('x-csrf-token');if(!csrfToken)throw new AuthError(403,'FORBIDDEN','CSRF validation failed.');await auth.requireCsrf(session.token,csrfToken);return json(request,env,{success:true,data:await organizer.createTask(session.data.tenant.id,session.data.user.id,await parseJson(request))},{status:201});}
       const plannerTaskRoute=/^\/api\/v1\/planner\/tasks\/([0-9a-f-]{36})$/i.exec(url.pathname);
@@ -563,6 +563,11 @@ export const app = {
         const session=await authenticatedSession(request,env,auth);requirePermission(toTenantContext(session.data),'resource.delete');
         const csrfToken=request.headers.get('x-csrf-token');if(!csrfToken)throw new AuthError(403,'FORBIDDEN','CSRF validation failed.');await auth.requireCsrf(session.token,csrfToken);
         return json(request,env,{success:true,data:await resources.deleteClassData(session.data.tenant.id,await parseJson(request))});
+      }
+      if (request.method === 'POST' && url.pathname === '/api/v1/classes/delete-resource') {
+        const session=await authenticatedSession(request,env,auth);requirePermission(toTenantContext(session.data),'resource.delete');
+        const csrfToken=request.headers.get('x-csrf-token');if(!csrfToken)throw new AuthError(403,'FORBIDDEN','CSRF validation failed.');await auth.requireCsrf(session.token,csrfToken);
+        return json(request,env,{success:true,data:await resources.deleteClassResourceData(session.data.tenant.id,await parseJson(request))});
       }
       if (url.pathname === '/api/v1/settings/theme' && (request.method === 'GET' || request.method === 'PATCH')) {
         const session = await authenticatedSession(request, env, auth);

@@ -196,6 +196,7 @@ export interface DashboardOverview {
 
 export interface ClassAnalyticsStudent {
   attemptId: string;
+  resourceId: string;
   studentName: string;
   studentEmail: string;
   resourceTitle: string;
@@ -208,6 +209,7 @@ export interface ClassAnalyticsStudent {
 
 export interface ClassAnalyticsQuestion {
   questionId: string;
+  resourceId: string;
   prompt: string;
   resourceTitle: string;
   incorrectCount: number;

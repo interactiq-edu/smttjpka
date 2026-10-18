@@ -32,6 +32,15 @@ export class WorkspaceOrganizerService {
     if(input?.confirmation!==folder.name)throw new AuthError(400,'VALIDATION_ERROR','Type the exact folder name to delete it.');
     await this.db.prepare('DELETE FROM workspace_folders WHERE tenant_id=? AND id=?').bind(tenantId,id).run();
   }
+  async renameFolder(tenantId:string,id:string,body:unknown):Promise<OrganizerFolder> {
+    const input=body as {name?:unknown};const name=this.name(input?.name);
+    const current=await this.db.prepare('SELECT section FROM workspace_folders WHERE tenant_id=? AND id=?').bind(tenantId,id).first<{section:OrganizerSection}>();
+    if(!current)throw new AuthError(404,'VALIDATION_ERROR','Folder not found.');
+    const duplicate=await this.db.prepare('SELECT id FROM workspace_folders WHERE tenant_id=? AND section=? AND name=? COLLATE NOCASE AND id<>?').bind(tenantId,current.section,name,id).first();
+    if(duplicate)throw new AuthError(409,'VALIDATION_ERROR','A folder with this name already exists.');
+    await this.db.prepare('UPDATE workspace_folders SET name=?,updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND id=?').bind(name,tenantId,id).run();
+    return (await this.folders(tenantId,current.section)).find((folder)=>folder.id===id)!;
+  }
   async moveResource(tenantId:string,body:unknown):Promise<void> {
     const input=body as {section?:unknown;resourceId?:unknown;folderId?:unknown};const section=this.section(input?.section);
     if(typeof input?.resourceId!=='string'||!uuid.test(input.resourceId))throw new AuthError(400,'VALIDATION_ERROR','Select a resource.');
