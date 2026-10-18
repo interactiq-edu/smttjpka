@@ -220,9 +220,11 @@ export type QuestionType =
   | 'REORDER'
   | 'MATH_RESPONSE'
   | 'LABELLING'
-  | 'HOTSPOT';
+  | 'HOTSPOT'
+  | 'MULTI_PART';
 
 export type QuestionInteraction =
+  | { kind: 'multi_part'; parts: LearningQuestion[] }
   | { kind: 'fill_blank'; template: string; blanks: Array<{ id: string; answers: string[]; mode: 'text' | 'dropdown'; options: string[] }>; ignoreAccents: boolean }
   | { kind: 'drag_drop'; template: string; blanks: Array<{ id: string; answer: string }>; distractors: string[] }
   | { kind: 'math_response'; calculator: boolean; handwriting?: boolean; parts?: Array<{ id: 'formula' | 'method' | 'answer'; label: string; enabled: boolean; marks: number; scheme: string; schemeDocument?: RichTextDocument }> }
@@ -252,6 +254,11 @@ export interface LearningQuestion {
 }
 
 export const gradeQuestionAnswer = (question: LearningQuestion, value: string | string[]): { correct: boolean | null; points: number } => {
+  if (question.interaction?.kind === 'multi_part') {
+    const answers = parsePartAnswers(value);
+    const grades = question.interaction.parts.map(part => gradeQuestionAnswer(part, answers[part.id] ?? ''));
+    return { correct: grades.some(g => g.correct === null) ? null : grades.every(g => g.correct), points: grades.reduce((sum,g) => sum + g.points,0) };
+  }
   if (question.type === 'OPEN_ENDED' || question.type === 'PASSAGE') return { correct: null, points: 0 };
   const interaction = question.interaction;
   const clean = (item: string, accents = false) => {
@@ -535,4 +542,32 @@ export interface AiBackupTestResult {
   provider: 'GEMINI';
   model: string;
   reply: string;
+}
+
+/** Part answers are data, never trusted question or mark definitions. */
+export function parsePartAnswers(value: string | string[] | undefined): Record<string, string | string[]> {
+  try {
+    const data: unknown = JSON.parse(typeof value === 'string' ? value : '{}');
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
+    return Object.fromEntries(Object.entries(data).filter(([,v]) => typeof v === 'string' || (Array.isArray(v) && v.every(x => typeof x === 'string'))));
+  } catch { return {}; }
+}
+export function questionRequiresAi(question: LearningQuestion): boolean {
+  return question.interaction?.kind === 'multi_part'
+    ? question.interaction.parts.some(questionRequiresAi)
+    : question.type === 'OPEN_ENDED' || question.type === 'MATH_RESPONSE';
+}
+export function questionAnswered(question: LearningQuestion, value: string | string[] | undefined): boolean {
+  if (question.interaction?.kind === 'multi_part') {
+    const values = parsePartAnswers(value);
+    return question.interaction.parts.every(part => questionAnswered(part, values[part.id]));
+  }
+  return Array.isArray(value) ? value.length > 0 && value.every(x => x.trim()) : Boolean(value?.trim());
+}
+export interface ClassRosterEntry { id: string; name: string; email: string; isNew?: boolean }
+export interface ClassRoster { className: string; entries: ClassRosterEntry[]; revision: number }
+export interface LibraryEntry {
+  id: string; section: 'notes' | 'tips'; parentId: string | null; kind: 'folder' | 'file';
+  title: string; description: string; tips: string; url: string; cover: string;
+  published: boolean; shareCode: string; position: number;
 }

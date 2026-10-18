@@ -1,0 +1,87 @@
+import { useEffect, useRef, useState, type ClipboardEvent } from 'react';
+import type { ClassRoster, ClassRosterEntry, ResourceReport } from '@interactiq/contracts';
+import type { ApiRequest } from './StudyLibrary';
+type Attempt=ResourceReport['attempts'][number];
+type Exporter=(format:'png'|'pdf',title:string,subtitle:string,headers:string[],rows:string[][])=>void;
+const identity=(value:string|null|undefined)=>(value??'').trim().toLocaleLowerCase().replace(/\s+/g,' ');
+const classKey=(value:string|null|undefined)=>identity(value).replace(/[^a-z0-9]/g,'');
+const blank=():ClassRosterEntry=>({id:crypto.randomUUID(),name:'',email:''});
+export function marks(attempt:Attempt|undefined):[string,string] {
+  if(!attempt)return ['',''];
+  if(attempt.pendingAiCount)return ['Pending AI',''];
+  if(attempt.assignmentReviewStatus&&attempt.assignmentReviewStatus!=='REVIEWED')return ['Teacher review',''];
+  const score=attempt.assignmentReviewStatus?attempt.assignmentMark:attempt.score;
+  return [score===null?'':`${score}/${attempt.maxScore??0}`,score!==null&&(attempt.maxScore??0)>0?`${Math.round(score! / attempt.maxScore! * 10000)/100}%`:''];
+}
+export function attemptsFor(entry:ClassRosterEntry,entries:ClassRosterEntry[],attempts:Attempt[]):Attempt[] {
+  const email=identity(entry.email),name=identity(entry.name);
+  if(!email&&(!name||entries.filter(e=>identity(e.name)===name).length!==1))return [];
+  const candidates=attempts.filter(a=>email?identity(a.studentEmail)===email:identity(a.studentFullName)===name);
+  if(!email&&new Set(candidates.map(a=>identity(a.studentEmail))).size>1)return [];
+  return candidates.sort((a,b)=>(a.submittedAt??'').localeCompare(b.submittedAt??'')||a.id.localeCompare(b.id));
+}
+export function StudentRoster({className,attempts,title,request,csrf,onExport,onSaved}:{className:string;attempts:Attempt[];title:string;request:ApiRequest;csrf:string;onExport:Exporter;onSaved:()=>void}) {
+  const [rows,setRows]=useState<ClassRosterEntry[]>([]);const [revision,setRevision]=useState(0);const [loading,setLoading]=useState(true);
+  const [dirty,setDirty]=useState(false);const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [selected,setSelected]=useState<number[]>([]);
+  const [cell,setCell]=useState({row:0,col:0});const [end,setEnd]=useState({row:0,col:0});const [menu,setMenu]=useState<{x:number;y:number}|null>(null);
+  const [download,setDownload]=useState<'png'|'pdf'|null>(null);const [fontSize,setFontSize]=useState(14);
+  const loadedIds=useRef<string[]>([]);
+  const undo=useRef<ClassRosterEntry[][]>([]),redo=useRef<ClassRosterEntry[][]>([]);const grid=useRef<HTMLDivElement>(null);
+  const load=()=>{setLoading(true);setError('');return request<ClassRoster>('/api/v1/rosters?class='+encodeURIComponent(className)).then(data=>{loadedIds.current=data.entries.map(e=>e.id);setRows([...data.entries,...Array.from({length:Math.max(1,10-data.entries.length)},blank)]);setRevision(data.revision);setDirty(false);undo.current=[];redo.current=[];setSelected([]);}).catch(e=>setError(e.message)).finally(()=>setLoading(false));};
+  useEffect(()=>{void load();},[className]);
+  useEffect(()=>{const warn=(e:BeforeUnloadEvent)=>{if(dirty){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[dirty]);
+  useEffect(()=>{if(!dirty&&!loading)void load();},[attempts.length]);
+  useEffect(()=>{const guard=(event:MouseEvent)=>{const target=event.target as HTMLElement;if(dirty&&target.closest('.nav-item,.student-path button')&&!confirm('You have unsaved student list changes. Leave without saving?')){event.preventDefault();event.stopPropagation();}};document.addEventListener('click',guard,true);return()=>document.removeEventListener('click',guard,true);},[dirty]);
+  const change=(next:ClassRosterEntry[])=>{undo.current=[...undo.current.slice(-99),rows];redo.current=[];setRows(next);setDirty(true);};
+  const history=(back:boolean)=>{const from=back?undo:redo,to=back?redo:undo;const next=from.current.pop();if(next){to.current.push(rows);setRows(next);setDirty(true);}};
+  const update=(index:number,col:number,value:string)=>{const next=rows.map((r,i)=>i===index?{...r,[col?'email':'name']:value}:r);if(index===rows.length-1)next.push(blank());change(next);};
+  const selectedRange=()=>({r1:Math.min(cell.row,end.row),r2:Math.max(cell.row,end.row),c1:Math.min(cell.col,end.col),c2:Math.max(cell.col,end.col)});
+  const copyText=()=>{const r=selectedRange();return rows.filter((_,i)=>selected.length?selected.includes(i):i>=r.r1&&i<=r.r2).map(row=>(selected.length?[row.name,row.email]:[row.name,row.email].slice(r.c1,r.c2+1)).join('\t')).join('\n');};
+  const clearCells=()=>{const r=selectedRange();change(rows.map((row,i)=>selected.length?selected.includes(i)?{...row,name:'',email:''}:row:i>=r.r1&&i<=r.r2?{...row,...(r.c1===0?{name:''}:{}),...(r.c2===1?{email:''}:{})}:row));};
+  const clipboard=async(cut=false)=>{try{await navigator.clipboard.writeText(copyText());if(cut)clearCells();}catch{setError('Clipboard permission is unavailable. Use Ctrl+C / Ctrl+V or your device’s paste menu.');}setMenu(null);};
+  const paste=(text:string)=>{const lines=text.replace(/\r/g,'').replace(/\n$/,'').split('\n');if(lines.length>2000){setError('Paste up to 2000 rows at a time.');return;}const next=rows.map(r=>({...r}));for(let i=0;i<lines.length;i++){const at=cell.row+i;if(at>=2000)break;while(next.length<=at)next.push(blank());const values=lines[i]!.split('\t');if(cell.col===0){next[at]!.name=values[0]??'';if(values[1]!==undefined)next[at]!.email=values[1];}else next[at]!.email=values[0]??'';}if(next.at(-1)?.name)next.push(blank());change(next);setMenu(null);};
+  const clipboardPaste=async()=>{try{paste(await navigator.clipboard.readText());}catch{setError('Click a cell, then use Ctrl+V or the Paste option on your device.');}};
+  const cutCopy=(event:ClipboardEvent,cut:boolean)=>{const target=event.target as HTMLInputElement;if(target.selectionStart!==target.selectionEnd&&!selected.length&&cell.row===end.row&&cell.col===end.col)return;event.preventDefault();event.clipboardData.setData('text/plain',copyText());if(cut)clearCells();};
+  const save=async()=>{setBusy(true);setError('');try{const data=await request<ClassRoster>('/api/v1/rosters',{method:'PUT',headers:{'content-type':'application/json','x-csrf-token':csrf},body:JSON.stringify({className,entries:rows.filter(r=>r.name.trim()||r.email.trim()),revision,deletedIds:loadedIds.current.filter(id=>!rows.some(r=>r.id===id&&(r.name.trim()||r.email.trim())))})});loadedIds.current=data.entries.map(e=>e.id);setRows([...data.entries,blank()]);setRevision(data.revision);setDirty(false);onSaved();}catch(e){setError(e instanceof Error?e.message:'Unable to save list.');}finally{setBusy(false);}};
+  const data=rows.map(row=>({row,attempts:attemptsFor(row,rows,attempts)}));const attemptsCount=Math.max(1,...data.map(d=>d.attempts.length));
+  const exportRows=(latest:boolean)=>{const count=latest?1:attemptsCount;const headers=['No','Nama Pelajar','Email Pelajar',...Array.from({length:count},(_,i)=>[latest?'Latest Marks':`Marks #${i+1}`,latest?'Percentage':`Percentage #${i+1}`]).flat(),'Status'];let number=0;const result=data.filter(d=>d.row.name.trim()).map(d=>[String(++number),d.row.name,d.row.email,...(latest?[marks(d.attempts.at(-1))]:Array.from({length:count},(_,i)=>marks(d.attempts[i]))).flat(),d.attempts.length?'Submitted':'BELUM JAWAB']);onExport(download!,title,className+' · '+(latest?'Latest attempt':'Full result'),headers,result);setDownload(null);};
+  let number=0;const range=selectedRange();
+  return <section className="roster-panel"><header className="roster-ribbon"><div><b>Student List</b><small>{dirty?'Unsaved changes':'Saved list'} · {rows.filter(r=>r.name).length} students</small></div><div className="roster-tools">
+    <button disabled={!undo.current.length||loading} onClick={()=>history(true)}>↶ Undo</button><button disabled={!redo.current.length||loading} onClick={()=>history(false)}>↷ Redo</button>
+    <button onClick={()=>void clipboard(true)}>Cut</button><button onClick={()=>void clipboard()}>Copy</button><button onClick={()=>void clipboardPaste()}>Paste</button>
+    <button onClick={()=>change([...rows,blank()])}>＋ Row</button><button disabled={!selected.length} onClick={()=>{change(rows.filter((_,i)=>!selected.includes(i)));setSelected([]);}}>Delete rows</button>
+    <select aria-label="Sheet font size" value={fontSize} onChange={e=>setFontSize(Number(e.target.value))}>{[12,14,16,18,20].map(n=><option key={n}>{n}</option>)}</select>
+    <button onClick={()=>{if(!dirty||confirm('Discard unsaved list changes and reload?'))void load();}}>Reload</button>
+    <button disabled={loading||busy} className="primary-action" onClick={()=>void save()}>{busy?'Saving…':'Save list'}</button>
+    <button disabled={loading} onClick={()=>setDownload('png')}>PNG</button><button disabled={loading} onClick={()=>setDownload('pdf')}>PDF</button>
+  </div></header><p className="sheet-help">Paste names and emails from Excel/Sheets. Shift-click selects a cell range; row checkboxes select whole rows. Marks are automatic and read-only. Save your list before leaving this page.</p>
+    {error&&<p className="message message--error" role="alert">{error}</p>}
+    {loading?<p role="status">Loading class list…</p>:<div className="roster-grid" ref={grid} style={{fontSize}} onCopy={e=>cutCopy(e,false)} onCut={e=>cutCopy(e,true)} onPaste={e=>{e.preventDefault();paste(e.clipboardData.getData('text/plain'));}} onContextMenu={e=>{e.preventDefault();setMenu({x:Math.min(e.clientX,window.innerWidth-180),y:Math.min(e.clientY,window.innerHeight-240)});}}><table><thead><tr><th><input aria-label="Select all rows" type="checkbox" checked={selected.length===rows.length&&rows.length>0} onChange={e=>setSelected(e.target.checked?rows.map((_,i)=>i):[])}/></th><th>No</th><th>Nama Pelajar</th><th>Email Pelajar</th>{Array.from({length:attemptsCount},(_,i)=><th colSpan={2} key={i}>Attempt {i+1}<small>Marks / Percentage</small></th>)}<th>Status</th></tr></thead><tbody>{data.map(({row,attempts:results},i)=><tr key={row.id} className={selected.includes(i)?'row-selected':row.name&&!results.length?'row-missing':''}>
+      <td><input type="checkbox" aria-label={`Select row ${i+1}`} checked={selected.includes(i)} onChange={e=>setSelected(e.target.checked?[...selected,i]:selected.filter(n=>n!==i))}/></td><td>{row.name.trim()?++number:''}</td>
+      {(['name','email'] as const).map((field,col)=><td key={field} className={i>=range.r1&&i<=range.r2&&col>=range.c1&&col<=range.c2?'cell-selected':''}>{field==='name'&&row.isNew&&<small className="new-student-badge">NEW</small>}<input data-cell={`${i}-${col}`} aria-label={`${field==='name'?'Name':'Email'} row ${i+1}`} value={row[field]} onFocus={()=>{setCell({row:i,col});setEnd({row:i,col});}} onMouseDown={e=>{if(e.shiftKey){e.preventDefault();setEnd({row:i,col});}}} onKeyDown={e=>{if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();history(!e.shiftKey);}if(e.key==='ArrowUp'||e.key==='ArrowDown'||e.key==='Enter'){e.preventDefault();const target=Math.max(0,Math.min(rows.length-1,i+(e.key==='ArrowUp'?-1:1)));grid.current?.querySelector<HTMLInputElement>(`[data-cell="${target}-${col}"]`)?.focus();}}} onChange={e=>update(i,col,e.target.value)}/></td>)}
+      {Array.from({length:attemptsCount},(_,a)=>marks(results[a]).map((value,c)=><td className="computed-cell" key={a+'-'+c}>{value}</td>))}
+      <td>{row.name&&(results.length?<span className="submitted-marker">✓ Submitted</span>:<span className="missing-marker">● Belum jawab</span>)}</td>
+    </tr>)}</tbody></table></div>}
+    {menu&&<><button className="sheet-menu-dismiss" aria-label="Close menu" onClick={()=>setMenu(null)}/><div className="sheet-context-menu" style={{left:menu.x,top:menu.y}} role="menu"><button onClick={()=>void clipboard(true)}>Cut</button><button onClick={()=>void clipboard()}>Copy</button><button onClick={()=>void clipboardPaste()}>Paste</button><button onClick={()=>{clearCells();setMenu(null);}}>Clear cells</button><button onClick={()=>{change(rows.filter((_,i)=>selected.length?!selected.includes(i):i!==cell.row));setSelected([]);setMenu(null);}}>Delete selected rows</button></div></>}
+    {download&&<div className="dialog-backdrop"><section className="dialog"><button className="dialog-close" onClick={()=>setDownload(null)}>×</button><h2>Download {download.toUpperCase()}</h2><p>Choose which attempts to include. Students who have not answered keep blank scores and are marked “BELUM JAWAB”.</p><button className="primary-action" onClick={()=>exportRows(false)}>Full Result</button><button className="primary-action" onClick={()=>exportRows(true)}>The Latest Attempt</button></section></div>}
+  </section>;
+}
+export function StudentsPanel({reports,request,csrf,onLoad,onExport}:{reports:ResourceReport[];request:ApiRequest;csrf:string;onLoad:()=>void;onExport:Exporter}) {
+  const [resourceId,setResourceId]=useState('');const [className,setClassName]=useState('');const [classes,setClasses]=useState<string[]>([]);
+  const [tab,setTab]=useState<'details'|'list'>('details');const [search,setSearch]=useState('');const [newClass,setNewClass]=useState('');const [error,setError]=useState('');
+  const refresh=()=>request<string[]>('/api/v1/rosters/classes').then(setClasses).catch(e=>setError(e.message));
+  useEffect(()=>{void refresh();onLoad();},[]);
+  const report=reports.find(r=>r.resource.id===resourceId);
+  const classNames=[...new Set([...classes,...(report?.attempts.map(a=>a.studentClassName??'No class')??[]),...(report?.resource.assignedClassName?[report.resource.assignedClassName]:[])])].filter((v,i,all)=>all.findIndex(w=>classKey(w)===classKey(v))===i);
+  const attempts=report?.attempts.filter(a=>classKey(a.studentClassName||'No class')===classKey(className))??[];
+  const grouped=new Map<string,Attempt[]>();for(const a of attempts){const key=a.studentEmail??a.id;grouped.set(key,[...(grouped.get(key)??[]),a]);}
+  return <section className="students-browser"><header className="section-heading"><div><p className="eyebrow">Learners</p><h2>Students by resource and class</h2><p>Plan your class list, then follow every attempt.</p></div><button className="primary-action" onClick={()=>{onLoad();void refresh();}}>Refresh submissions</button></header>
+    {error&&<p className="message message--error">{error}</p>}<div className="student-path"><button onClick={()=>{setResourceId('');setClassName('');}}>Resources</button>{report&&<button onClick={()=>setClassName('')}>› {report.resource.title}</button>}{className&&<b>› {className}</b>}</div>
+    {!className&&<section className="class-roster-picker"><label>Create or manage class list<input list="roster-classes" value={newClass} onChange={e=>setNewClass(e.target.value)} placeholder="Choose or type a class name"/></label><datalist id="roster-classes">{classNames.map(c=><option key={c} value={c}/>)}</datalist><button disabled={!newClass.trim()} onClick={()=>{setClassName(newClass.trim());setTab('list');}}>Open Student List</button></section>}
+    {!className&&(!report?<div className="student-resource-list">{reports.map(r=><button key={r.resource.id} onClick={()=>setResourceId(r.resource.id)}><span className="student-resource-icon">▣</span><strong>{r.resource.title}</strong><b>{r.attempts.length} submissions →</b></button>)}</div>:<div className="student-class-list">{classNames.map(c=><button key={c} onClick={()=>{setClassName(c);setTab('details');}}><span className="avatar">{c[0]}</span><strong>{c}</strong><b>Open →</b></button>)}</div>)}
+    {className&&<><div className="report-tabs"><button className={tab==='details'?'active':''} onClick={()=>setTab('details')}>Details</button><button className={tab==='list'?'active':''} onClick={()=>setTab('list')}>Student List</button></div>
+      <div hidden={tab!=='list'}><StudentRoster key={classKey(className)+'-'+resourceId} className={className} title={report?.resource.title??'Class roster'} attempts={attempts} request={request} csrf={csrf} onExport={onExport} onSaved={()=>void refresh()}/></div>
+      {tab==='details'&&<><input aria-label="Search students" placeholder="Search student or email" value={search} onChange={e=>setSearch(e.target.value)}/><div className="student-directory">{[...grouped.entries()].filter(([email,list])=>(email+' '+list[0]?.studentFullName).toLowerCase().includes(search.toLowerCase())).map(([email,list])=><details key={email} className="student-attempt-card"><summary><strong>{list[0]?.studentFullName??email}</strong><small>{email} · {list.length} attempts</small></summary>{[...list].sort((a,b)=>(a.submittedAt??'').localeCompare(b.submittedAt??'')).map((a,i)=><p key={a.id}>Attempt {i+1} · {a.submittedAt?new Date(a.submittedAt.replace(' ','T')+(a.submittedAt.includes('T')?'':'Z')).toLocaleString('en-MY'):''}<b>{marks(a).join(' · ')}</b></p>)}</details>)}</div>{!attempts.length&&<p>No submissions for this resource and class yet. Add names in Student List to track who has not answered.</p>}</>}
+    </>}
+  </section>;
+}

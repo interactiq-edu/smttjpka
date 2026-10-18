@@ -1,0 +1,20 @@
+// Local-only disposable QA server. Never deploy this entry point.
+import { createServer } from 'node:http';
+import { pbkdf2Sync, randomBytes } from 'node:crypto';
+import { database } from './upgrade-fixture';
+import { app } from '../src/index';
+import { StudyLibraryService,covers } from '../src/learning/library';
+const {db,sqlite}=database();
+const salt=randomBytes(16);
+sqlite.prepare('INSERT INTO tenant_settings(tenant_id) VALUES(?)').run('tenant');
+sqlite.prepare("INSERT INTO admin_users(user_id,tenant_id,username,password_algorithm,password_hash,password_salt,password_iterations) VALUES(?,?,?,'PBKDF2-HMAC-SHA-256',?,?,100000)").run('teacher','tenant','preview',pbkdf2Sync('LocalPreviewOnly2026!',salt,100000,32,'sha256').toString('base64url'),salt.toString('base64url'));
+sqlite.prepare("INSERT INTO user_roles(user_id,role_id,tenant_id) VALUES('teacher','role_tenant_admin','tenant')").run();
+const resourceId='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+sqlite.prepare("INSERT INTO learning_resources(id,tenant_id,created_by_user_id,title,resource_type,assigned_class_name,content_json) VALUES(?,'tenant','teacher','Upgrade classroom demo','QUIZ','5 PKA 1',?)").run(resourceId,'{"type":"doc","content":[]}');
+const library=new StudyLibraryService(db);
+const initial=await library.save('tenant',{section:'notes',kind:'folder',title:'Discover something new',description:'A collection for curious minds.',cover:'books'});
+const root=initial[0]!;
+for(const [i,cover] of covers.entries())await library.save('tenant',{section:'notes',kind:'file',parentId:root.id,title:['The learning garden','Inside the science lab','Explore our planet','Patterns and numbers','Make something wonderful','Your next chapter','Words worth sharing','A connected classroom','A bright idea','Celebrate progress'][i],description:'Explore, reflect, and build your understanding one step at a time.',url:'https://www.khanacademy.org/',cover});
+await library.publish('tenant',root.id,true);
+const env={DB:db,MEDIA:{async get(){return null;},async put(){throw new Error('Use service tests for uploads.');},async delete(){},async list(){return {objects:[],truncated:false};}},APP_ENV:'development' as const,DEFAULT_TENANT_SLUG:'test-tenant',RATE_LIMIT_PEPPER:'local-only-preview-pepper-not-a-real-secret',ALLOWED_ORIGIN:'http://127.0.0.1:5176,http://localhost:5176'};
+createServer(async(req,res)=>{try{const chunks:Buffer[]=[];for await(const chunk of req)chunks.push(Buffer.from(chunk));const body=Buffer.concat(chunks);const headers=new Headers();for(const [k,v]of Object.entries(req.headers))if(v)headers.set(k,Array.isArray(v)?v.join(','):v);const request=new Request('http://127.0.0.1:8788'+req.url,{method:req.method,headers,...(body.length?{body}:{} )});const response=await app.fetch(request,env);res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));}catch(e){console.error(e);res.writeHead(500);res.end('Local QA error');}}).listen(8788,'127.0.0.1',()=>console.log('Disposable QA API ready on 127.0.0.1:8788. Public preview: #/study/'+root.shareCode));

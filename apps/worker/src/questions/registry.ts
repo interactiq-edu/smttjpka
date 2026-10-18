@@ -2,7 +2,7 @@ import type { CreateQuestionInput, QuestionInteraction, QuestionOption, Question
 import { AuthError } from '../auth/service';
 
 const questionTypes = new Set<QuestionType>([
-  'MULTIPLE_CHOICE', 'MULTI_SELECT', 'TRUE_FALSE', 'FILL_IN_THE_BLANKS', 'OPEN_ENDED', 'PASSAGE',
+  'MULTI_PART', 'MULTIPLE_CHOICE', 'MULTI_SELECT', 'TRUE_FALSE', 'FILL_IN_THE_BLANKS', 'OPEN_ENDED', 'PASSAGE',
   'DRAG_AND_DROP', 'CATEGORIZE', 'MATCH', 'MATCH_TABLE_GRID', 'DROPDOWN', 'REORDER', 'MATH_RESPONSE', 'LABELLING', 'HOTSPOT',
 ]);
 
@@ -161,6 +161,25 @@ export const parseQuestionInput = (value: unknown): CreateQuestionInput => {
   const timeLimitSeconds = body.timeLimitSeconds === undefined || body.timeLimitSeconds === null ? null : body.timeLimitSeconds;
   if (timeLimitSeconds !== null && (typeof timeLimitSeconds !== 'number' || !Number.isInteger(timeLimitSeconds) || timeLimitSeconds < 5 || timeLimitSeconds > 5400)) {
     throw new AuthError(400, 'VALIDATION_ERROR', 'The time limit must be between 5 seconds and 90 minutes, or left unset.');
+  }
+  if (type === 'MULTI_PART') {
+    const config = body.interaction as {kind?:string;parts?:unknown[]} | undefined;
+    if (config?.kind !== 'multi_part' || !Array.isArray(config.parts) || config.parts.length < 2 || config.parts.length > 20 || JSON.stringify(config).length > 2_000_000)
+      throw new AuthError(400,'VALIDATION_ERROR','Multi-Part needs between 2 and 20 parts.');
+    const ids = new Set<string>();
+    const parts = config.parts.map((entry,index) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new AuthError(400,'VALIDATION_ERROR','Invalid question part.');
+      const part = entry as Record<string,unknown>;
+      if (part.type === 'MULTI_PART' || typeof part.id !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(part.id) || ids.has(part.id))
+        throw new AuthError(400,'VALIDATION_ERROR','Parts need unique identifiers and cannot contain Multi-Part questions.');
+      ids.add(part.id);
+      const correctAnswer = part.type === 'TRUE_FALSE' && Array.isArray(part.options) ? part.options.find((option:{isCorrect?:boolean})=>option.isCorrect)?.id : part.correctAnswer;
+      const parsed = parseQuestionInput({...part,correctAnswer,acceptedAnswers:Array.isArray(part.acceptedAnswers)?part.acceptedAnswers.filter(answer=>typeof answer!=='string'||answer.trim()):part.acceptedAnswers});
+      return {...parsed,id:part.id,position:index,options:parsed.options??[],acceptedAnswers:parsed.acceptedAnswers??[],points:parsed.points??1,timeLimitSeconds:parsed.timeLimitSeconds??null};
+    });
+    const total = parts.reduce((sum,part)=>sum+part.points,0);
+    if (total > 1000) throw new AuthError(400,'VALIDATION_ERROR','Combined part marks cannot exceed 1000.');
+    return {type,prompt:requireDocument(body.prompt),options:[],acceptedAnswers:[],interaction:{kind:'multi_part',parts},points:total,timeLimitSeconds};
   }
   const options = parseOptions(body.options, type);
   if (type === 'TRUE_FALSE') {

@@ -1,4 +1,4 @@
-import { gradeQuestionAnswer } from '@interactiq/contracts';
+import { gradeQuestionAnswer, questionRequiresAi, parsePartAnswers } from '@interactiq/contracts';
 import type { AiMarkingStatus, AttemptAnswerInput, AttemptResult, AttemptReview, LearningQuestion, LiveWhiteboardStroke, OpenEndedPreviewGradeResult, QuestionCheckResult, ResourceReport, RichTextDocument, RichTextNode } from '@interactiq/contracts';
 import { AuthError } from '../auth/service';
 import { QuestionRepository } from '../questions/repository';
@@ -23,6 +23,10 @@ const parseMathResponse=(value:string|string[]):MathResponsePayload|null=>{try{c
 const documentImages=(document?:RichTextDocument):string[]=>{const found:string[]=[];const walk=(nodes:RichTextNode[])=>{for(const node of nodes){if(node.type==='image'&&typeof node.attrs?.src==='string')found.push(node.attrs.src);if(node.content)walk(node.content);}};if(document)walk(document.content);return found;};
 
 export const displayAnswer = (value: string | string[], question: LearningQuestion): string | string[] => {
+  if(question.interaction?.kind==='multi_part'){
+    const answers=parsePartAnswers(value);
+    return question.interaction.parts.map((part,index)=>`Part ${index+1}: ${[displayAnswer(answers[part.id]??'',part)].flat().join('; ')}`);
+  }
   if(question.interaction?.kind==='math_response'){
     const response=parseMathResponse(value);if(!response)return Array.isArray(value)?value.join(''):value;
     const labels=new Map((question.interaction.parts??[]).map((part)=>[part.id,part.label]));
@@ -60,6 +64,7 @@ export const displayAnswer = (value: string | string[], question: LearningQuesti
 };
 
 const correctAnswer = (question: LearningQuestion): string | string[] | null => {
+  if(question.interaction?.kind==='multi_part') return question.interaction.parts.map((part,index)=>`Part ${index+1}: ${[correctAnswer(part)??'Teacher review'].flat().join('; ')}`);
   const options = question.options.filter((option) => option.isCorrect).map((option) => option.text);
   if (options.length) return options.length === 1 ? options[0]! : options;
   if (question.interaction?.kind === 'fill_blank') return question.interaction.blanks.map((blank) => blank.answers.join(' / '));
@@ -189,7 +194,7 @@ export class AttemptService {
     const graded = submission.answers.map((answer) => {
       const question = questionMap.get(answer.questionId)!;
       const normal = gradeAnswer(question, answer.value);
-      const requiresAi = question.type === 'OPEN_ENDED' || question.type === 'MATH_RESPONSE';
+      const requiresAi = questionRequiresAi(question);
       const aiMarkingStatus:AiMarkingStatus=requiresAi?'PENDING':'NOT_REQUIRED';
       return { answer, result: requiresAi ? { correct:null, points:null } : normal, ai:null as AiGradeResult|null, aiMarkingStatus };
     });
@@ -252,7 +257,7 @@ export class AttemptService {
     if(attempt.resultReleasePolicy!=='IMMEDIATE_PER_QUESTION')throw new AuthError(403,'FORBIDDEN','Immediate answer checking is not enabled.');
     const input=body&&typeof body==='object'&&!Array.isArray(body)?body as Record<string,unknown>:{}; if(!isUuid(input.questionId)||!(typeof input.value==='string'||(Array.isArray(input.value)&&input.value.every((item)=>typeof item==='string'))))throw new AuthError(400,'VALIDATION_ERROR','A valid answer is required.');
     const question=(await this.questions.list(tenantId,attempt.resourceId)).find((item)=>item.id===input.questionId); if(!question)throw new AuthError(404,'VALIDATION_ERROR','The question does not exist.');
-    if(question.type==='OPEN_ENDED'||question.type==='MATH_RESPONSE'){const ai=await this.aiGrade(tenantId,question,input.value as string|string[]);return {questionId:question.id,correct:null,points:ai?.points??null,maxPoints:question.points,aiMarkingStatus:ai?'GRADED':'PENDING'};}
+    if(questionRequiresAi(question)){const ai=await this.aiGrade(tenantId,question,input.value as string|string[]);return {questionId:question.id,correct:null,points:ai?.points??null,maxPoints:question.points,aiMarkingStatus:ai?'GRADED':'PENDING'};}
     const result=gradeAnswer(question,input.value as string|string[]); return {questionId:question.id,correct:result.correct,points:result.points,maxPoints:question.points,correctAnswer:correctAnswer(question)};
   }
 
@@ -261,7 +266,7 @@ export class AttemptService {
     const value = input.value;
     if (!(typeof value === 'string' || (Array.isArray(value) && value.every((item) => typeof item === 'string'))) || JSON.stringify(value).length > 4_500_000) throw new AuthError(400, 'VALIDATION_ERROR', 'Enter a valid preview answer.');
     const question = (await this.questions.list(tenantId, resourceId)).find((item) => item.id === questionId);
-    if (!question || (question.type !== 'OPEN_ENDED'&&question.type!=='MATH_RESPONSE')) throw new AuthError(404, 'VALIDATION_ERROR', 'The AI-marked question does not exist.');
+    if (!question || !questionRequiresAi(question)) throw new AuthError(404, 'VALIDATION_ERROR', 'The AI-marked question does not exist.');
     const ai = await this.aiGrade(tenantId, question, value);
     if (!ai) throw new AuthError(503, 'CONFIGURATION_ERROR', 'AI preview marking is temporarily unavailable. Try again shortly.');
     return { questionId, correct: null, points: ai.points, maxPoints: question.points, aiFeedback: ai.feedback };
@@ -282,7 +287,7 @@ export class AttemptService {
         EXISTS (SELECT 1 FROM attempts other WHERE other.tenant_id = a.tenant_id AND other.status = 'COMPLETED'
           AND other.user_id <> a.user_id AND LOWER(TRIM(other.student_full_name)) = LOWER(TRIM(a.student_full_name))) AS duplicateNameWarning
         FROM attempts a JOIN users u ON u.id = a.user_id WHERE a.tenant_id = ? AND a.resource_id = ? AND a.status = 'COMPLETED'
-        ORDER BY a.submitted_at DESC LIMIT 200`).bind(tenantId, resource.id).all<Record<string, unknown>>();
+        ORDER BY a.submitted_at DESC`).bind(tenantId, resource.id).all<Record<string, unknown>>();
       const attempts = result.results.map((row) => ({ id: String(row.id), resourceId: resource.id, status: 'COMPLETED' as const,
         score: Number(row.score ?? 0), maxScore: Number(row.pendingAiCount??0)>0?Number(row.gradedMaxScore??0):Number(row.maxScore ?? 0), submittedAt: String(row.submittedAt),
         studentFullName: row.studentFullName ? String(row.studentFullName) : null, studentClassName: row.studentClassName ? String(row.studentClassName) : null,
@@ -314,7 +319,7 @@ export class AttemptService {
       aa.teacher_points AS teacherPoints, aa.teacher_feedback AS teacherFeedback, q.points AS maxPoints
       FROM attempt_answers aa JOIN questions q ON q.id = aa.question_id WHERE aa.attempt_id = ?
       ORDER BY (SELECT position FROM quiz_questions WHERE question_id = q.id LIMIT 1)`).bind(attemptId).all<Record<string, unknown>>();
-    const answers=rows.results.map((row) => { const config = JSON.parse(String(row.configurationJson)) as Pick<LearningQuestion, 'options' | 'acceptedAnswers' | 'interaction'>; const question = { id: String(row.questionId), type: row.questionType as LearningQuestion['type'], prompt: JSON.parse(String(row.promptJson)), options: config.options ?? [], acceptedAnswers: config.acceptedAnswers ?? [], interaction: config.interaction ?? null, points: Number(row.maxPoints), timeLimitSeconds: null, position: 0 } satisfies LearningQuestion; const rawAnswer = JSON.parse(String(row.answerJson)) as string | string[]; const aiMarkingStatus=(row.aiMarkingStatus??(row.teacherPoints!==null?'MANUAL':row.aiSuggestedPoints!==null?'GRADED':question.type==='OPEN_ENDED'||question.type==='MATH_RESPONSE'?'PENDING':'NOT_REQUIRED')) as AiMarkingStatus; return ({ questionId: String(row.questionId), questionType: row.questionType as LearningQuestion['type'],
+    const answers=rows.results.map((row) => { const config = JSON.parse(String(row.configurationJson)) as Pick<LearningQuestion, 'options' | 'acceptedAnswers' | 'interaction'>; const question = { id: String(row.questionId), type: row.questionType as LearningQuestion['type'], prompt: JSON.parse(String(row.promptJson)), options: config.options ?? [], acceptedAnswers: config.acceptedAnswers ?? [], interaction: config.interaction ?? null, points: Number(row.maxPoints), timeLimitSeconds: null, position: 0 } satisfies LearningQuestion; const rawAnswer = JSON.parse(String(row.answerJson)) as string | string[]; const aiMarkingStatus=(row.aiMarkingStatus??(row.teacherPoints!==null?'MANUAL':row.aiSuggestedPoints!==null?'GRADED':questionRequiresAi(question)?'PENDING':'NOT_REQUIRED')) as AiMarkingStatus; return ({ questionId: String(row.questionId), questionType: row.questionType as LearningQuestion['type'],
       prompt: question.prompt, rawAnswer, answer: displayAnswer(rawAnswer, question), correctAnswer: correctAnswer(question), interaction: question.interaction ?? null, isCorrect: row.isCorrect === null ? null : Number(row.isCorrect) === 1,
       awardedPoints: row.awardedPoints === null ? null : Number(row.awardedPoints), aiSuggestedPoints: row.aiSuggestedPoints === null ? null : Number(row.aiSuggestedPoints),
       aiFeedback: row.aiFeedback ? String(row.aiFeedback) : null, teacherPoints: row.teacherPoints === null ? null : Number(row.teacherPoints),
@@ -362,7 +367,7 @@ export class AttemptService {
     const row=await this.db.prepare(`SELECT q.id, q.question_type AS type, q.prompt_json AS promptJson, q.configuration_json AS configurationJson,
       q.points, q.time_limit_seconds AS timeLimitSeconds, aa.answer_json AS answerJson
       FROM attempt_answers aa JOIN attempts a ON a.id=aa.attempt_id JOIN questions q ON q.id=aa.question_id
-      WHERE a.id=? AND a.tenant_id=? AND aa.question_id=? AND q.question_type IN ('OPEN_ENDED','MATH_RESPONSE') LIMIT 1`)
+      WHERE a.id=? AND a.tenant_id=? AND aa.question_id=? AND q.question_type IN ('OPEN_ENDED','MATH_RESPONSE','MULTI_PART') LIMIT 1`)
       .bind(attemptId,tenantId,questionId).first<Record<string,unknown>>();
     if(!row)throw new AuthError(404,'VALIDATION_ERROR','The pending AI-marked answer does not exist.');
     const config=JSON.parse(String(row.configurationJson)) as Pick<LearningQuestion,'options'|'acceptedAnswers'|'interaction'>;
@@ -452,6 +457,21 @@ export class AttemptService {
   }
 
   private async aiGrade(tenantId:string,question: LearningQuestion, answer: string | string[]): Promise<AiGradeResult | null> {
+    if (question.interaction?.kind === 'multi_part') {
+      const values = parsePartAnswers(answer);
+      let points = 0;
+      const feedback: string[] = [];
+      let provider: AiGradeResult['provider'] = 'CLOUDFLARE';
+      for (const [index,part] of question.interaction.parts.entries()) {
+        const value = values[part.id] ?? '';
+        const context = {...part,prompt:{type:'doc' as const,content:[...question.prompt.content,...part.prompt.content]}};
+        const grade: AiGradeResult | null = questionRequiresAi(part) ? await this.aiGrade(tenantId,context,value) : {...gradeAnswer(part,value),feedback:'Automatically marked',provider};
+        if (!grade) return null;
+        points += grade.points; provider = grade.provider;
+        feedback.push(`Part ${index+1}: ${grade.points}/${part.points}. ${grade.feedback}`);
+      }
+      return {points,feedback:feedback.join('\n'),provider};
+    }
     if (!this.ai) return null;
     try {
       const math=question.interaction?.kind==='math_response'&&question.interaction.parts?.length?parseMathResponse(answer):null;

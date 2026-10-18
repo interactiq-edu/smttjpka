@@ -7,6 +7,8 @@ import { ResourceRepository } from './resources/repository';
 import { ResourceService } from './resources/service';
 import { QuestionRepository } from './questions/repository';
 import { QuestionService } from './questions/service';
+import { RosterService } from './learning/rosters';
+import { StudyLibraryService } from './learning/library';
 import { AttemptService } from './attempts/service';
 import { verifyGoogleCredential } from './auth/google';
 import { constantTimeEqual } from './auth/crypto';
@@ -274,6 +276,8 @@ export const app = {
         // Memory control deliberately focuses on R2. Query each reference source
         // separately because D1 limits the number of terms in a compound SELECT.
         const referenceGroups=await Promise.all([
+          env.DB.prepare('SELECT url AS value FROM study_library WHERE tenant_id=? UNION ALL SELECT cover AS value FROM study_library WHERE tenant_id=?').bind(tenantId,tenantId).all<{value:string|null}>(),
+          env.DB.prepare('SELECT configuration_json AS value FROM questions WHERE tenant_id=?').bind(tenantId).all<{value:string|null}>(),
           env.DB.prepare('SELECT asset_url AS value FROM learning_resources WHERE tenant_id = ? AND asset_url IS NOT NULL').bind(tenantId).all<{value:string|null}>(),
           env.DB.prepare('SELECT content_json AS value FROM learning_resources WHERE tenant_id = ?').bind(tenantId).all<{value:string|null}>(),
           env.DB.prepare('SELECT prompt_json AS value FROM questions WHERE tenant_id = ?').bind(tenantId).all<{value:string|null}>(),
@@ -308,6 +312,7 @@ export const app = {
           env.DB.prepare('UPDATE questions SET prompt_json = replace(prompt_json, ?, ?), updated_at = CURRENT_TIMESTAMP WHERE tenant_id = ? AND instr(prompt_json, ?) > 0').bind(mediaUrl,'',tenantId,mediaUrl),
           env.DB.prepare('UPDATE flashcards SET front_json = replace(front_json, ?, ?), back_json = replace(back_json, ?, ?), updated_at = CURRENT_TIMESTAMP WHERE tenant_id = ? AND (instr(front_json, ?) > 0 OR instr(back_json, ?) > 0)').bind(mediaUrl,'',mediaUrl,'',tenantId,mediaUrl,mediaUrl),
         ]);
+        await env.DB.prepare("UPDATE study_library SET published=0,updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND (instr(url,?)>0 OR instr(cover,?)>0)").bind(tenantId,mediaUrl,mediaUrl).run();
         await env.MEDIA.delete(key);
         return json(request,env,{success:true,data:{deleted:true}});
       }
@@ -503,6 +508,32 @@ export const app = {
         const response = json(request, env, { success: true, data: {} });
         response.headers.append('set-cookie', clearSessionCookie(env));
         return response;
+      }
+      if (request.method === 'GET' && /^\/api\/v1\/study-public\/[a-f0-9]{32}$/.test(url.pathname)) {
+        return json(request,env,{success:true,data:await new StudyLibraryService(env.DB).publicTree(url.pathname.split('/').pop()!)});
+      }
+      if (url.pathname === '/api/v1/rosters' || url.pathname === '/api/v1/rosters/classes' || url.pathname.startsWith('/api/v1/study-library')) {
+        const session=await authenticatedSession(request,env,auth);
+        requirePermission(toTenantContext(session.data),request.method==='GET'?'resource.read':request.method==='DELETE'?'resource.delete':'resource.update');
+        if(request.method!=='GET'){
+          const csrf=request.headers.get('x-csrf-token');
+          if(!csrf)throw new AuthError(403,'FORBIDDEN','CSRF validation failed.');
+          await auth.requireCsrf(session.token,csrf);
+        }
+        const tenant=session.data.tenant.id;const rosters=new RosterService(env.DB);const library=new StudyLibraryService(env.DB);
+        let data:unknown;
+        if(url.pathname==='/api/v1/rosters/classes'&&request.method==='GET')data=await rosters.classes(tenant);
+        else if(url.pathname==='/api/v1/rosters'&&request.method==='GET')data=await rosters.get(tenant,url.searchParams.get('class')??'');
+        else if(url.pathname==='/api/v1/rosters'&&request.method==='PUT')data=await rosters.save(tenant,await parseJson(request));
+        else if(url.pathname==='/api/v1/study-library'&&request.method==='GET')data=await library.list(tenant);
+        else if(url.pathname==='/api/v1/study-library'&&request.method==='POST')data=await library.save(tenant,await parseJson(request));
+        else if(url.pathname==='/api/v1/study-library/publish'&&request.method==='POST'){
+          const body=await parseJson(request) as {id?:unknown;published?:unknown};
+          if(typeof body.id!=='string'||typeof body.published!=='boolean')throw new AuthError(400,'VALIDATION_ERROR','Invalid publication request.');
+          data=await library.publish(tenant,body.id,body.published);
+        }else if(/^\/api\/v1\/study-library\/[a-f0-9-]{36}$/.test(url.pathname)&&request.method==='DELETE')data=await library.remove(tenant,url.pathname.split('/').pop()!);
+        else throw new AuthError(404,'VALIDATION_ERROR','Not found.');
+        return json(request,env,{success:true,data});
       }
       if (request.method === 'GET' && url.pathname === '/api/v1/dashboard') {
         const session = await authenticatedSession(request, env, auth);
