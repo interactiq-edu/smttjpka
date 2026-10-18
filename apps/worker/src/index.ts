@@ -90,7 +90,7 @@ const corsHeaders = (request: Request, env: Env): Headers => {
     headers.set('access-control-allow-origin', origin);
     headers.set('access-control-allow-credentials', 'true');
     headers.set('access-control-allow-headers', 'authorization, content-type, x-csrf-token');
-    headers.set('access-control-allow-methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+    headers.set('access-control-allow-methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
     headers.set('access-control-expose-headers', 'content-length, content-range, accept-ranges');
     headers.set('vary', 'Origin');
   }

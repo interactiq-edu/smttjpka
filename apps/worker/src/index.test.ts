@@ -52,6 +52,18 @@ describe('InteractIQ API foundation', () => {
     expect(localResponse.headers.get('access-control-allow-origin')).toBe('http://localhost:5173');
     expect(localResponse.headers.get('access-control-allow-headers')).toContain('authorization');
 
+    const rosterPreflight = await app.fetch(new Request('https://api.example.test/api/v1/rosters', {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'https://interactiq-edu.github.io',
+        'access-control-request-method': 'PUT',
+        'access-control-request-headers': 'content-type,x-csrf-token',
+      },
+    }), corsEnv);
+    expect(rosterPreflight.status).toBe(204);
+    expect(rosterPreflight.headers.get('access-control-allow-methods')).toContain('PUT');
+    expect(rosterPreflight.headers.get('access-control-allow-headers')).toContain('x-csrf-token');
+
     const rejectedResponse = await app.fetch(new Request('https://api.example.test/api/v1/health', {
       method: 'OPTIONS',
       headers: { origin: 'https://untrusted.example' },
