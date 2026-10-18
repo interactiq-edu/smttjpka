@@ -13,6 +13,7 @@ import { AttemptService } from './attempts/service';
 import { verifyGoogleCredential } from './auth/google';
 import { constantTimeEqual } from './auth/crypto';
 import { openRedirectToken, sealRedirectToken } from './auth/redirect-token';
+import { WorkspaceOrganizerService } from './workspace/organizer';
 
 export interface Env extends AuthEnvironment {
   APP_ENV: 'development' | 'staging' | 'production';
@@ -243,7 +244,20 @@ export const app = {
     const resources = new ResourceService(resourceRepository, questionRepository);
     const questions = new QuestionService(resourceRepository, questionRepository);
     const attempts = new AttemptService(env.DB, env.AI, env.MEDIA, env.AI_GATEWAY_ID ?? 'default', env.AI_BACKUP_MODEL ?? 'gemini-3.8-flash', env.AI_GATEWAY_ACCOUNT_ID, env.AI_GATEWAY_TOKEN);
+    const organizer = new WorkspaceOrganizerService(env.DB);
     try {
+      if (url.pathname === '/api/v1/organizer-folders' && ['GET','POST'].includes(request.method)) {
+        const session=await authenticatedSession(request,env,auth);requirePermission(toTenantContext(session.data),request.method==='GET'?'resource.read':'resource.update');
+        if(request.method==='GET')return json(request,env,{success:true,data:await organizer.folders(session.data.tenant.id,url.searchParams.get('section'))});
+        const csrfToken=request.headers.get('x-csrf-token');if(!csrfToken)throw new AuthError(403,'FORBIDDEN','CSRF validation failed.');await auth.requireCsrf(session.token,csrfToken);
+        return json(request,env,{success:true,data:await organizer.createFolder(session.data.tenant.id,session.data.user.id,await parseJson(request))},{status:201});
+      }
+      const organizerFolderRoute=/^\/api\/v1\/organizer-folders\/([0-9a-f-]{36})$/i.exec(url.pathname);
+      if(request.method==='DELETE'&&organizerFolderRoute){const session=await authenticatedSession(request,env,auth);requirePermission(toTenantContext(session.data),'resource.update');const csrfToken=request.headers.get('x-csrf-token');if(!csrfToken)throw new AuthError(403,'FORBIDDEN','CSRF validation failed.');await auth.requireCsrf(session.token,csrfToken);await organizer.deleteFolder(session.data.tenant.id,organizerFolderRoute[1]!,await parseJson(request));return json(request,env,{success:true,data:{}});}
+      if(request.method==='PATCH'&&url.pathname==='/api/v1/organizer-folders/assignment'){const session=await authenticatedSession(request,env,auth);requirePermission(toTenantContext(session.data),'resource.update');const csrfToken=request.headers.get('x-csrf-token');if(!csrfToken)throw new AuthError(403,'FORBIDDEN','CSRF validation failed.');await auth.requireCsrf(session.token,csrfToken);await organizer.moveResource(session.data.tenant.id,await parseJson(request));return json(request,env,{success:true,data:{}});}
+      if(url.pathname==='/api/v1/planner/tasks'&&['GET','POST'].includes(request.method)){const session=await authenticatedSession(request,env,auth);requirePermission(toTenantContext(session.data),request.method==='GET'?'report.read':'resource.update');if(request.method==='GET')return json(request,env,{success:true,data:await organizer.tasks(session.data.tenant.id)});const csrfToken=request.headers.get('x-csrf-token');if(!csrfToken)throw new AuthError(403,'FORBIDDEN','CSRF validation failed.');await auth.requireCsrf(session.token,csrfToken);return json(request,env,{success:true,data:await organizer.createTask(session.data.tenant.id,session.data.user.id,await parseJson(request))},{status:201});}
+      const plannerTaskRoute=/^\/api\/v1\/planner\/tasks\/([0-9a-f-]{36})$/i.exec(url.pathname);
+      if(plannerTaskRoute&&['PATCH','DELETE'].includes(request.method)){const session=await authenticatedSession(request,env,auth);requirePermission(toTenantContext(session.data),'resource.update');const csrfToken=request.headers.get('x-csrf-token');if(!csrfToken)throw new AuthError(403,'FORBIDDEN','CSRF validation failed.');await auth.requireCsrf(session.token,csrfToken);if(request.method==='DELETE'){await organizer.deleteTask(session.data.tenant.id,plannerTaskRoute[1]!);return json(request,env,{success:true,data:{}});}return json(request,env,{success:true,data:await organizer.updateTask(session.data.tenant.id,plannerTaskRoute[1]!,await parseJson(request))});}
       if (request.method === 'GET' && url.pathname === '/api/v1/storage/usage') {
         const session = await authenticatedSession(request, env, auth);
         requirePermission(toTenantContext(session.data), 'report.read');

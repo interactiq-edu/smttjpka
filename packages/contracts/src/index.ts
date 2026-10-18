@@ -129,6 +129,24 @@ export interface ResourceFolder {
   updatedAt: string;
 }
 
+export type OrganizerSection = 'STUDENTS' | 'REPORTS';
+export interface OrganizerFolder extends ResourceFolder {
+  section: OrganizerSection;
+  resourceIds: string[];
+}
+
+export type PlannerStatus = 'DONE' | 'WORKING' | 'STUCK' | 'NOT_STARTED';
+export interface PlannerTask {
+  id: string;
+  task: string;
+  status: PlannerStatus;
+  label: string | null;
+  labelColor: string | null;
+  dueDate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface RichTextMark {
   type: 'bold' | 'italic' | 'underline' | 'strike' | 'superscript' | 'subscript' | 'link' | 'highlight' | 'textStyle';
   attrs?: Record<string, string>;
