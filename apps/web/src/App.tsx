@@ -438,7 +438,7 @@ function WorkspaceApp() {
   useEffect(() => {
     if (!session || isStudentContext || view !== 'home') return;
     const refresh = () => { if (document.visibilityState === 'visible') void request<DashboardOverview>('/api/v1/dashboard').then(setDashboard).catch(() => undefined); };
-    refresh(); const timer=window.setInterval(refresh,10000); return ()=>window.clearInterval(timer);
+    refresh(); document.addEventListener('visibilitychange',refresh); const timer=window.setInterval(refresh,60000); return ()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',refresh);};
   }, [session, isStudentContext, view, request]);
   useEffect(() => {
     if (!isStudentContext || !session || !csrf || !joinCode || !joinInfo || joinInfoCode!==joinCode || session.tenant.slug!==joinInfo.tenantSlug || joined.current || accessIsPending) return;
