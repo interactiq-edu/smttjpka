@@ -341,6 +341,46 @@ button,input,select,textarea{font:inherit}button{transition:transform .18s ease,
 @media(max-width:760px){.login-page.premium-auth{display:flex;min-height:100svh;flex-direction:column;padding:0;overflow:auto;background:#faf8ff}.learning-landscape{order:-1;min-height:230px;padding:28px 26px 38px;border-radius:0 0 34px 34px}.learning-landscape__copy>span{padding:7px 11px;font-size:.68rem}.learning-landscape__copy h2{margin:15px 0 7px;font-size:clamp(2.55rem,13vw,4.2rem);line-height:.9}.learning-landscape__copy p{display:none}.learning-sun{top:4%;right:3%;width:120px}.learning-cloud--one{top:64%;right:5%;scale:.55}.learning-cloud--two,.learning-orbit,.learning-grass{display:none}.learning-book{right:5%;bottom:8%;width:135px;height:78px}.learning-hill{bottom:-65%}.login-auth-panel{place-items:start center;padding:34px 24px 48px}.premium-auth .login-card{width:min(100%,500px)}.premium-auth .login-brand{margin-bottom:30px}.premium-auth .login-brand .brand-wordmark{width:245px}.premium-auth .login-card h1{font-size:2.35rem}.app-shell{display:block}.sidebar{position:fixed;top:auto;right:0;bottom:0;left:0;width:auto!important;height:72px;flex-direction:row;gap:5px;padding:8px 10px;border-top:1px solid var(--iq-line);border-right:0;background:rgba(251,249,255,.94)}.sidebar .brand-button{display:none}.nav-list{display:flex;width:100%;flex-direction:row;gap:4px;overflow-x:auto}.nav-item{min-width:58px;flex:1;justify-content:center;padding:8px}.nav-item:hover{transform:none}.nav-icon{width:25px;height:25px}.sidebar .nav-label{display:none!important}.settings-link{margin:0}.topbar{min-height:76px;padding:13px 18px}.topbar-actions{gap:7px}.service-status{padding:7px;font-size:0}.service-status .status-dot{margin:0}.topbar .text-action{padding:8px;font-size:.76rem}.content{padding:20px 16px 100px}.hero-card{grid-template-columns:1fr;min-height:auto;padding:29px 24px}.hero-card__visual{display:none}.metric-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.metric-card{min-height:100px;gap:10px;padding:15px}.metric-card__icon{width:42px;height:42px;flex-basis:42px}.metric-card strong{font-size:1.55rem}}
 @media(max-width:440px){.metric-grid{grid-template-columns:1fr}.metric-card{min-height:86px}.premium-auth .login-card h1{font-size:2rem}.learning-landscape{min-height:205px}.learning-book{opacity:.58}}
 @media(prefers-reduced-motion:reduce){html:focus-within{scroll-behavior:auto}*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* Tablet and mobile viewport safety. Dialogs scroll inside the current viewport
+   instead of following a long page, including iPadOS Safari. */
+.dialog-backdrop{box-sizing:border-box;overflow:auto;overscroll-behavior:contain;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));touch-action:pan-y}
+.dialog{box-sizing:border-box;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.review-backdrop{align-items:center;overflow:hidden}
+.review-dialog{width:min(920px,100%);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);margin:0;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.final-review-backdrop{z-index:120;display:flex;align-items:center;justify-content:center}
+.final-review-panel{position:relative;top:auto;left:auto;box-sizing:border-box;width:min(480px,100%);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;transform:none;border:1px solid #e3dcd4;border-radius:22px;padding:28px;background:#fff;box-shadow:0 30px 100px rgba(0,0,0,.35);-webkit-overflow-scrolling:touch}
+.final-review-panel>.dialog-close{position:sticky;z-index:2;top:0;display:grid;width:42px;height:42px;margin:-17px -17px -20px auto;place-items:center;border-radius:50%;background:#fff;box-shadow:0 5px 20px rgba(0,0,0,.12)}
+.final-score-list{max-height:min(42vh,360px);overflow:auto;overscroll-behavior:contain}
+
+@media(max-width:1050px){
+  .content{padding-inline:clamp(16px,3vw,30px)}
+  .editor-actions,.compact-theme,.report-resource-actions,.report-export-actions,.submitted-assignment__actions{flex-wrap:wrap}
+  .compact-theme>*{min-width:min(220px,100%)}
+  .dialog-actions button,.dialog-actions a,.editor-actions button,.report-resource-actions button,.report-export-actions button{min-height:44px}
+  button,.nav-item,.drive-more,.organizer-more{touch-action:manipulation}
+}
+@media(max-width:760px){
+  input,select,textarea{font-size:16px}
+  .sidebar{height:calc(72px + env(safe-area-inset-bottom));padding-bottom:max(8px,env(safe-area-inset-bottom))}
+  .content{padding-bottom:calc(100px + env(safe-area-inset-bottom))}
+  .dialog-backdrop{padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
+  .dialog,.review-dialog{max-height:calc(100vh - 20px);max-height:calc(100dvh - 20px)}
+  .dialog-actions{position:sticky;z-index:2;bottom:-1px;margin-right:-8px;margin-bottom:-8px;margin-left:-8px;padding:12px 8px max(8px,env(safe-area-inset-bottom));background:linear-gradient(to bottom,rgba(255,255,255,.88),#fff 24%)}
+  .compact-theme{align-items:stretch;flex-direction:column}
+  .compact-theme>*{width:100%;min-width:0}
+  .inline-control{align-items:stretch;flex-direction:column}
+  .inline-control button{width:100%}
+  .topbar h1{overflow-wrap:anywhere}
+}
+@media(max-width:620px){
+  .final-review-backdrop{align-items:flex-end;padding:0}
+  .final-review-panel{width:100%;max-height:88vh;max-height:88dvh;border-width:1px 0 0;border-radius:24px 24px 0 0;padding:24px 20px max(18px,env(safe-area-inset-bottom))}
+  .final-review-panel>.dialog-close{margin:-14px -10px -17px auto}
+  .final-score-list{max-height:30vh;max-height:30dvh}
+  .final-review-panel .dialog-actions{display:grid;grid-template-columns:1fr}
+  .final-review-panel .dialog-actions button{width:100%}
+}
 .login-auth-panel{padding-block:clamp(24px,4vh,52px)}.premium-auth .login-brand{margin-bottom:clamp(24px,5vh,50px)}
 @media(max-width:760px){.login-auth-panel{padding:34px 24px 48px}.premium-auth .login-brand{margin-bottom:30px}}
 
