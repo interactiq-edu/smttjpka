@@ -1,7 +1,7 @@
 import type { AiUsageSummary, ApiErrorCode, ApiResponse, HealthData, LiveParticipant, StorageInventory } from '@interactiq/contracts';
 import { AuthError, AuthService, type AuthEnvironment } from './auth/service';
 import { PasswordResetService } from './auth/password-reset';
-import { requirePermission, toTenantContext } from './auth/authorization';
+import { isStudentOnlyContext, requirePermission, toTenantContext } from './auth/authorization';
 import type { D1Database } from './db/types';
 import { ResourceRepository } from './resources/repository';
 import { ResourceService } from './resources/service';
@@ -717,7 +717,7 @@ export const app = {
         const session = await authenticatedSession(request, env, auth); requirePermission(toTenantContext(session.data), request.method === 'GET' ? 'resource.read' : 'resource.update');
         if (request.method === 'GET') {
           const state=await resources.getLiveState(session.data.tenant.id, liveRoute[1]!);
-          if(session.data.roles.includes('STUDENT')){
+          if(isStudentOnlyContext(toTenantContext(session.data))){
             const active=await env.DB.prepare(`SELECT a.id FROM attempts a JOIN learning_resources r ON r.id=a.resource_id AND r.tenant_id=a.tenant_id
               WHERE a.tenant_id=? AND a.resource_id=? AND a.user_id=? AND a.status='IN_PROGRESS' AND a.kicked_at IS NULL AND r.status='PUBLISHED' LIMIT 1`)
               .bind(session.data.tenant.id,liveRoute[1]!,session.data.user.id).first<{id:string}>();

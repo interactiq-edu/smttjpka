@@ -542,7 +542,7 @@ function WorkspaceApp() {
       ['QUIZ','PRESENTATION','INTERACTIVE_VIDEO'].includes(detail.type) ? request<LearningQuestion[]>(`/api/v1/resources/${id}/questions`) : Promise.resolve([]),
       detail.type === 'FLASHCARD_SET' ? request<Flashcard[]>(`/api/v1/resources/${id}/flashcards`) : Promise.resolve([]),
       isLive ? request<LiveResourceState>(`/api/v1/resources/${id}/live`) : Promise.resolve(null),
-      isLive ? request<LiveParticipant[]>(`/api/v1/resources/${id}/live/participants`) : Promise.resolve([]),
+      isLive ? request<LiveParticipant[]>(`/api/v1/resources/${id}/live/participants`).catch(() => []) : Promise.resolve([]),
     ]);
     setQuestions(questionData);setFlashcards(cardData);setLiveState(stateData);setLiveParticipants(participantData);navigateView('editor');
   } catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to open resource.'); } finally { setBusy(''); } };

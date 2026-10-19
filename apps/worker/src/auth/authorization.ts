@@ -19,6 +19,13 @@ export const toTenantContext = (session: { tenant: { id: string }; user: { id: s
   roles: session.roles,
 });
 
+// A user can legitimately hold both STUDENT and an administrative role.  Treat
+// the session as a student session only when it has no workspace-management
+// permission; otherwise admin requests for draft live resources would be
+// subjected to the published-attempt gate intended for learners.
+export const isStudentOnlyContext = (context: Pick<TenantContext, 'roles'>): boolean =>
+  context.roles.includes('STUDENT') && !context.roles.some((role) => permissionRoles['resource.update'].includes(role));
+
 export const requirePermission = (context: TenantContext, permission: Permission): void => {
   if (!context.roles.some((role) => permissionRoles[permission].includes(role))) {
     throw new AuthError(403, 'FORBIDDEN', 'You do not have permission for this action.');
