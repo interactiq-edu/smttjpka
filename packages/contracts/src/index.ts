@@ -590,5 +590,5 @@ export interface ClassRoster { className: string; entries: ClassRosterEntry[]; r
 export interface LibraryEntry {
   id: string; section: 'notes' | 'tips'; parentId: string | null; kind: 'folder' | 'file';
   title: string; description: string; tips: string; url: string; cover: string;
-  published: boolean; shareCode: string; position: number;
+  studentNote: string; published: boolean; shareCode: string; position: number;
 }

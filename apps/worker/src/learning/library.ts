@@ -2,7 +2,7 @@ import type { LibraryEntry } from '@interactiq/contracts';
 import { AuthError } from '../auth/service';
 import type { D1Database } from '../db/types';
 
-const columns = 'id, section, parent_id AS parentId, kind, title, description, tips, url, cover, published, share_code AS shareCode, position';
+const columns = 'id, section, parent_id AS parentId, kind, title, description, tips, url, cover, student_note AS studentNote, published, share_code AS shareCode, position';
 const hosts = ['youtube.com','youtu.be','canva.com','docs.google.com','drive.google.com','sheets.google.com','slides.google.com','forms.gle','onedrive.live.com','1drv.ms','sharepoint.com','microsoft.com','wikipedia.org','khanacademy.org','geogebra.org','desmos.com'];
 export const covers = ['books','science','globe','maths','art','graduation','pencil','computer','ideas','trophy'];
 export function safeLibraryUrl(value:string,tenant:string,cover=false):boolean {
@@ -33,7 +33,7 @@ export class StudyLibraryService {
     const all=await this.list(tenant);const existing=body.id?all.find(e=>e.id===body.id):undefined;
     if(body.id&&!existing)throw new AuthError(404,'VALIDATION_ERROR','Library item not found.');
     if(existing&&(existing.kind!==body.kind||existing.section!==body.section))throw new AuthError(400,'VALIDATION_ERROR','An existing item cannot change its library or type.');
-    for(const field of ['description','tips','url','cover'] as const)if(body[field]!==undefined&&(typeof body[field]!=='string'||body[field]!.length>(field==='tips'?20000:field==='description'?4000:2048)))throw new AuthError(400,'VALIDATION_ERROR','Invalid library text or URL.');
+    for(const field of ['description','tips','studentNote','url','cover'] as const)if(body[field]!==undefined&&(typeof body[field]!=='string'||body[field]!.length>(field==='tips'?20000:field==='description'?4000:field==='studentNote'?6000:2048)))throw new AuthError(400,'VALIDATION_ERROR','Invalid library text, student note, or URL.');
     const parent=body.parentId?all.find(e=>e.id===body.parentId):null;
     if(body.parentId&&(!parent||parent.kind!=='folder'||parent.section!==body.section))throw new AuthError(400,'VALIDATION_ERROR','Choose a folder in the same library.');
     let ancestor=parent;let depth=0;
@@ -41,8 +41,8 @@ export class StudyLibraryService {
     const url=body.url?.trim()??'';const cover=body.cover??'books';
     if(!safeLibraryUrl(url,tenant)||!safeLibraryUrl(cover,tenant,true)||(body.kind==='file'&&!url))throw new AuthError(400,'VALIDATION_ERROR','Upload a supported file or use an HTTPS link from YouTube, Canva, Google Drive, Microsoft, Wikipedia, Khan Academy, GeoGebra or Desmos.');
     const id=existing?.id??crypto.randomUUID();
-    await this.db.prepare(`INSERT INTO study_library(id,tenant_id,section,parent_id,kind,title,description,tips,url,cover,share_code,position) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET parent_id=excluded.parent_id,title=excluded.title,description=excluded.description,tips=excluded.tips,url=excluded.url,cover=excluded.cover,updated_at=CURRENT_TIMESTAMP WHERE study_library.tenant_id=excluded.tenant_id`)
-      .bind(id,tenant,body.section,body.parentId??null,body.kind,body.title.trim(),body.description??'',body.tips??'',body.kind==='folder'?'':url,cover,existing?.shareCode??crypto.randomUUID().replaceAll('-',''),existing?.position??all.length).run();
+    await this.db.prepare(`INSERT INTO study_library(id,tenant_id,section,parent_id,kind,title,description,tips,url,cover,student_note,share_code,position) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET parent_id=excluded.parent_id,title=excluded.title,description=excluded.description,tips=excluded.tips,url=excluded.url,cover=excluded.cover,student_note=excluded.student_note,updated_at=CURRENT_TIMESTAMP WHERE study_library.tenant_id=excluded.tenant_id`)
+      .bind(id,tenant,body.section,body.parentId??null,body.kind,body.title.trim(),body.description??'',body.tips??'',body.kind==='folder'?'':url,cover,body.studentNote??'',existing?.shareCode??crypto.randomUUID().replaceAll('-',''),existing?.position??all.length).run();
     return this.list(tenant);
   }
   async publish(tenant:string,id:string,published:boolean):Promise<LibraryEntry[]> {
