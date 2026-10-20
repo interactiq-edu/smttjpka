@@ -22,4 +22,18 @@ describe('workspace organizer',()=>{
     expect(folders.every((item)=>!item.resourceIds.includes(resourceId))).toBe(true);
     sqlite.close();
   });
+
+  it('deletes every calendar task only after the typed confirmation',async()=>{
+    const {db,sqlite}=database();
+    const service=new WorkspaceOrganizerService(db);
+    await service.createTask('tenant','teacher',{task:'Prepare lesson',status:'NOT_STARTED',dueDate:'2026-10-21'});
+    await service.createTask('tenant','teacher',{task:'Review marks',status:'WORKING',dueDate:'2026-10-22'});
+
+    await expect(service.deleteAllTasks('tenant',{confirmation:'calendar'})).rejects.toThrow('Type calender');
+    expect(await service.tasks('tenant')).toHaveLength(2);
+
+    await expect(service.deleteAllTasks('tenant',{confirmation:'calender'})).resolves.toBe(2);
+    expect(await service.tasks('tenant')).toEqual([]);
+    sqlite.close();
+  });
 });
