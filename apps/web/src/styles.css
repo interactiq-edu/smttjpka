@@ -381,6 +381,10 @@ button,input,select,textarea{font:inherit}button{transition:transform .18s ease,
   .final-review-panel .dialog-actions{display:grid;grid-template-columns:1fr}
   .final-review-panel .dialog-actions button{width:100%}
 }
+.library-drive{min-width:0;max-width:100%}
+.library-drive .drive-details{display:block;max-width:100%;overflow-x:auto!important;overflow-y:hidden!important;overscroll-behavior-inline:contain;scrollbar-width:thin;touch-action:pan-x pan-y;-webkit-overflow-scrolling:touch}
+.library-drive .drive-details::-webkit-scrollbar{height:10px}.library-drive .drive-details::-webkit-scrollbar-thumb{border:2px solid #fff;border-radius:999px;background:#cfc4ed}.library-drive .drive-details::-webkit-scrollbar-track{background:#f7f4ff}
+html,body,#root{max-width:100%}body{overflow-x:hidden}.workspace,.content,.dashboard-analytics,.analytics-chart-grid,.analytics-chart-card{min-width:0}img,video,canvas,iframe{max-width:100%}
 .login-auth-panel{padding-block:clamp(24px,4vh,52px)}.premium-auth .login-brand{margin-bottom:clamp(24px,5vh,50px)}
 @media(max-width:760px){.login-auth-panel{padding:34px 24px 48px}.premium-auth .login-brand{margin-bottom:30px}}
 
