@@ -1,4 +1,5 @@
 import type { AttemptPolicy, CreateLearningResourceInput, Flashcard, LearningResourceDetail, LearningResourceSummary, LiveResourceState, LiveWhiteboardStroke, PublishedResource, QuizTheme, ResourceFolder, ResourceType, ResultReleasePolicy, RichTextDocument, RichTextMark, RichTextNode, TenantThemeSettings } from '@interactiq/contracts';
+import { QUIZ_THEME_IDS } from '@interactiq/contracts';
 import { AuthError } from '../auth/service';
 import { QuestionRepository } from '../questions/repository';
 import { normalizeClassName, ResourceRepository } from './repository';
@@ -119,6 +120,17 @@ export class ResourceService {
     return resource;
   }
 
+  async updateDisplayBadge(tenantId: string, resourceId: string, body: unknown): Promise<LearningResourceSummary> {
+    const input = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
+    const badgeId = input.badgeId;
+    if (badgeId !== null && (typeof badgeId !== 'number' || !Number.isInteger(badgeId) || badgeId < 1 || badgeId > 30)) {
+      throw new AuthError(400, 'VALIDATION_ERROR', 'Choose one of the 30 display badges.');
+    }
+    const resource = await this.resources.updateDisplayBadge(tenantId, resourceId, badgeId);
+    if (!resource) throw new AuthError(404, 'VALIDATION_ERROR', 'The requested resource does not exist.');
+    return resource;
+  }
+
   async create(tenantId: string, userId: string, body: unknown): Promise<LearningResourceSummary> {
     const input = parseCreateInput(body);
     return this.resources.create({
@@ -181,8 +193,8 @@ export class ResourceService {
   }
 
   async updateTheme(tenantId: string, resourceId: string, body: unknown): Promise<LearningResourceSummary> {
-    const themeId = body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>).themeId : null;
-    if (typeof themeId !== 'string' || !isQuizTheme(themeId)) throw new AuthError(400, 'VALIDATION_ERROR', 'Select a valid quiz theme.');
+    const themeId = body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>).themeId : undefined;
+    if (themeId !== null && (typeof themeId !== 'string' || !isQuizTheme(themeId))) throw new AuthError(400, 'VALIDATION_ERROR', 'Select a valid quiz theme.');
     const resource = await this.resources.updateTheme(tenantId, resourceId, themeId);
     if (!resource) throw new AuthError(404, 'VALIDATION_ERROR', 'The requested resource does not exist.');
     return resource;
@@ -241,7 +253,8 @@ export class ResourceService {
       description: source.description, type: source.type, attemptPolicy: source.attemptPolicy, assignedClassName: source.assignedClassName });
     await this.resources.updateAssignedClass(tenantId, copy.id, source.assignedClassNames ?? []);
     await this.resources.updateContent(tenantId, copy.id, source.content);
-    await this.resources.updateTheme(tenantId, copy.id, source.themeId);
+    await this.resources.updateTheme(tenantId, copy.id, source.themeOverrideId ?? null);
+    if (source.displayBadgeId != null) await this.resources.updateDisplayBadge(tenantId, copy.id, source.displayBadgeId);
     await this.resources.updateDelivery(tenantId, copy.id, source.assetUrl, source.externalUrl);
     if (source.type === 'ASSESSMENT') await this.resources.updateAssignmentSettings(tenantId, copy.id, source.submissionDueAt, source.assignmentMaxScore);
     if (this.questions) for (const question of await this.questions.list(tenantId, source.id)) await this.questions.create({ tenantId, userId,
@@ -316,7 +329,7 @@ export class ResourceService {
   }
 }
 
-const isQuizTheme = (value: string): value is QuizTheme => ['AURORA','OCEAN','SUNSET','FOREST','GALAXY','CANDY','NEON','PAPER','SAFARI','MIDNIGHT'].includes(value);
+const isQuizTheme = (value: string): value is QuizTheme => (QUIZ_THEME_IDS as readonly string[]).includes(value);
 const isValidStroke = (stroke: unknown): boolean => {
   if (!stroke || typeof stroke !== 'object' || Array.isArray(stroke)) return false;
   const value = stroke as Record<string, unknown>;

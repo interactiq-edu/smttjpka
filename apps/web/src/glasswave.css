@@ -1,0 +1,111 @@
+/* Theme Studio previews are presentation-only and never write resource data. */
+.premium-theme-studio{display:grid;gap:22px}
+.studio-status,.studio-preview-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.studio-status{border:1px solid #dedaf1;border-radius:18px;padding:15px 18px;background:#fff}
+.studio-status span{color:#68647a}.studio-status b{color:#221b55}
+.premium-theme-studio .theme-card{position:relative;min-width:0;overflow:hidden}
+.premium-theme-studio .theme-card strong,.premium-theme-studio .theme-card small{min-width:0;overflow-wrap:anywhere}
+.premium-theme-studio .theme-card .theme-orb{display:grid;place-items:center;color:#fff;font-size:1.7rem;font-weight:900}
+.theme-card.theme-glasswave-learn{--theme-bg:linear-gradient(145deg,#02c2ea,#4a68f8 60%,#bd8fff)}
+.theme-card.theme-glasswave-learn .theme-orb{box-shadow:0 10px 28px rgba(44,105,217,.27),inset 0 0 0 1px rgba(255,255,255,.62)}
+.studio-preview-heading{margin-top:12px}
+.studio-preview-heading h3{margin:3px 0 0;font-size:1.4rem}
+.studio-preview-tabs{display:flex;flex-wrap:wrap;gap:7px;border:1px solid #dcd8eb;border-radius:15px;padding:5px;background:#f4f2fb}
+.studio-preview-tabs button{border:0;border-radius:10px;padding:9px 14px;background:transparent;color:#514a68;font-weight:800;cursor:pointer}
+.studio-preview-tabs button.active{background:#fff;color:#3d31bb;box-shadow:0 4px 12px rgba(48,39,105,.11)}
+.studio-preview{--studio-a:#5e52ec;--studio-b:#a58bf2;--studio-ink:#151838;position:relative;isolation:isolate;min-height:310px;overflow:hidden;border:1px solid #d7d8f1;border-radius:24px;background:linear-gradient(126deg,#e8eaff,#f6f2ff 55%,#e2dcff);color:var(--studio-ink);box-shadow:0 20px 55px rgba(46,58,125,.11)}
+.studio-preview::before,.studio-preview::after{position:absolute;z-index:-1;width:340px;height:230px;border-radius:50%;background:var(--studio-b);opacity:.3;filter:blur(48px);content:""}
+.studio-preview::before{top:-100px;right:-80px}.studio-preview::after{bottom:-130px;left:-80px;background:var(--studio-a)}
+.studio-preview.theme-glasswave-learn{--studio-a:#14c4ef;--studio-b:#7f95ff;--studio-ink:#102563;background:linear-gradient(125deg,#f7fdff,#e4f3ff 45%,#dce6ff 78%,#f8efff)}
+.studio-preview.theme-ocean{--studio-a:#087abf;--studio-b:#64caef}.studio-preview.theme-sunset{--studio-a:#df674c;--studio-b:#f6b87d}.studio-preview.theme-forest{--studio-a:#288a62;--studio-b:#a3e7ad}.studio-preview.theme-galaxy{--studio-a:#7466db;--studio-b:#ada0ef}.studio-preview.theme-candy{--studio-a:#d756a7;--studio-b:#ffc1df}.studio-preview.theme-neon{--studio-a:#0b9f9d;--studio-b:#70e8d2}.studio-preview.theme-paper{--studio-a:#76634c;--studio-b:#ead8bb}.studio-preview.theme-safari{--studio-a:#ad7339;--studio-b:#e9d190}.studio-preview.theme-midnight{--studio-a:#b99142;--studio-b:#9aa2c0}
+.studio-preview-nav{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(255,255,255,.83);padding:17px clamp(18px,3vw,32px);background:rgba(255,255,255,.54);font-weight:800;backdrop-filter:blur(14px)}
+.studio-preview-nav span:first-child{color:var(--studio-a);font-size:1.15rem}.studio-preview-nav span:last-child{font-size:.8rem}
+.studio-preview-body{max-width:760px;padding:30px clamp(20px,4vw,46px) 36px}
+.studio-preview-body>p{margin:0 0 7px;color:var(--studio-a);font-size:.72rem;font-weight:900;letter-spacing:.16em}
+.studio-preview-body h3{max-width:620px;margin:0 0 25px;font-size:clamp(1.65rem,3vw,2.8rem);line-height:1.08;letter-spacing:-.05em}
+.studio-preview-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.studio-preview-cards article{display:grid;gap:4px;min-width:0;border:1px solid rgba(255,255,255,.85);border-radius:16px;padding:15px;background:rgba(255,255,255,.67);box-shadow:0 9px 25px rgba(39,76,160,.07);backdrop-filter:blur(12px)}
+.studio-preview-cards article span{color:var(--studio-a);font-size:1.4rem}.studio-preview-cards article b{font-size:.95rem}.studio-preview-cards article small{color:#5a6688}
+.studio-preview--student .studio-preview-cards{grid-template-columns:repeat(2,minmax(0,1fr));max-width:490px}
+.studio-preview-answers{display:grid;gap:9px;max-width:470px}.studio-preview-answers span{border:1px solid #dce4fa;border-radius:12px;padding:11px 15px;background:rgba(255,255,255,.75);font-weight:700}
+.studio-preview-note{margin:-10px 0 0;color:#726c80;font-size:.82rem}
+
+/* GlassWave Learn is opt-in. All classic theme CSS remains untouched. */
+.app-shell.theme-aurora{--admin-theme-accent:#6254de;--admin-theme-soft:#eee9ff;--admin-theme-edge:#d7ccff}
+.app-shell.theme-ocean{--admin-theme-accent:#147db8;--admin-theme-soft:#e5f7ff;--admin-theme-edge:#b5e1f5}
+.app-shell.theme-sunset{--admin-theme-accent:#d6694b;--admin-theme-soft:#fff0e7;--admin-theme-edge:#ffd1b7}
+.app-shell.theme-forest{--admin-theme-accent:#29855f;--admin-theme-soft:#eaf8ee;--admin-theme-edge:#b9e2c6}
+.app-shell.theme-galaxy{--admin-theme-accent:#6255c8;--admin-theme-soft:#eeebff;--admin-theme-edge:#c9c2f2}
+.app-shell.theme-candy{--admin-theme-accent:#bd50a1;--admin-theme-soft:#fff0fa;--admin-theme-edge:#f4cae6}
+.app-shell.theme-neon{--admin-theme-accent:#087d84;--admin-theme-soft:#e4fbf8;--admin-theme-edge:#b2e9e2}
+.app-shell.theme-paper{--admin-theme-accent:#806b54;--admin-theme-soft:#f7f3ed;--admin-theme-edge:#ded4c6}
+.app-shell.theme-safari{--admin-theme-accent:#a66a32;--admin-theme-soft:#fff6e5;--admin-theme-edge:#e9d6a8}
+.app-shell.theme-midnight{--admin-theme-accent:#555d9b;--admin-theme-soft:#eaebf5;--admin-theme-edge:#c9cde2}
+.app-shell:is(.theme-aurora,.theme-ocean,.theme-sunset,.theme-forest,.theme-galaxy,.theme-candy,.theme-neon,.theme-paper,.theme-safari,.theme-midnight){--iq-violet:var(--admin-theme-accent);--iq-violet-deep:var(--admin-theme-accent);--iq-lavender-soft:var(--admin-theme-soft);--iq-line:var(--admin-theme-edge)}
+.app-shell:is(.theme-aurora,.theme-ocean,.theme-sunset,.theme-forest,.theme-galaxy,.theme-candy,.theme-neon,.theme-paper,.theme-safari,.theme-midnight) .workspace{background:linear-gradient(145deg,#fff,var(--admin-theme-soft))}
+.app-shell:is(.theme-aurora,.theme-ocean,.theme-sunset,.theme-forest,.theme-galaxy,.theme-candy,.theme-neon,.theme-paper,.theme-safari,.theme-midnight) .nav-item[aria-current="page"]{border-color:var(--admin-theme-edge);background:linear-gradient(130deg,var(--admin-theme-soft),#fff);color:var(--admin-theme-accent)}
+.app-shell:is(.theme-aurora,.theme-ocean,.theme-sunset,.theme-forest,.theme-galaxy,.theme-candy,.theme-neon,.theme-paper,.theme-safari,.theme-midnight) .hero-card{border-color:var(--admin-theme-edge);background:linear-gradient(120deg,#fff,var(--admin-theme-soft) 50%,var(--admin-theme-edge))}
+.app-shell:is(.theme-aurora,.theme-ocean,.theme-sunset,.theme-forest,.theme-galaxy,.theme-candy,.theme-neon,.theme-paper,.theme-safari,.theme-midnight) .primary-action--dark{background:var(--admin-theme-accent)}
+.app-shell.theme-glasswave-learn{--iq-ink:#122353;--iq-muted:#5d7095;--iq-line:#c6ddf6;--iq-violet:#356ff1;--iq-violet-deep:#2157ce;--iq-lavender-soft:#e4f2ff;--iq-sky:#ddf9ff;--iq-shadow-sm:0 12px 34px rgba(28,80,156,.11);--iq-shadow:0 24px 60px rgba(28,80,156,.16)}
+.app-shell.theme-glasswave-learn .workspace{background:radial-gradient(circle at 89% 9%,rgba(155,182,255,.36),transparent 32%),radial-gradient(circle at 9% 56%,rgba(75,212,236,.25),transparent 30%),linear-gradient(145deg,#f8fdff,#eef8ff 55%,#edf0ff)}
+.app-shell.theme-glasswave-learn .sidebar{border-right-color:rgba(157,205,242,.8);background:linear-gradient(165deg,rgba(255,255,255,.9),rgba(224,241,255,.88));box-shadow:9px 0 35px rgba(34,107,184,.07)}
+.app-shell.theme-glasswave-learn .topbar{border-bottom-color:rgba(167,211,243,.8);background:rgba(250,254,255,.81)}
+.glasswave-experience-badge{display:inline-flex;align-items:center;min-height:34px;border:1px solid #a9dbfa;border-radius:999px;padding:6px 12px;background:linear-gradient(110deg,#e7fbff,#e5eaff);color:#215cbd;font-size:.7rem;font-weight:900;letter-spacing:.02em;white-space:nowrap;box-shadow:0 7px 18px rgba(41,119,197,.1)}
+.app-shell.theme-glasswave-learn .nav-item[aria-current="page"]{border-color:#8ecaf8;background:linear-gradient(125deg,#e3f9ff,#dceaff);color:#145ec4;box-shadow:0 9px 26px rgba(32,137,205,.16)}
+.app-shell.theme-glasswave-learn .nav-item:hover{border-color:#addafa;background:#edfaff;color:#145ec4}
+.app-shell.theme-glasswave-learn .hero-card{border-color:#b4dcff;background:linear-gradient(118deg,#e0faff,#bedcff 56%,#c9c5ff);box-shadow:0 24px 62px rgba(42,124,195,.17)}
+.app-shell.theme-glasswave-learn .hero-card::after{position:absolute;z-index:-1;right:-12%;bottom:-95px;width:70%;height:170px;border-radius:50%;background:rgba(255,255,255,.43);filter:blur(8px);content:""}
+.app-shell.theme-glasswave-learn .hero-card__visual>span{border-color:#d7faff;background:linear-gradient(145deg,#fff,#d4faff 58%,#d6ddff);color:#2477df;animation:glasswave-lift 6s ease-in-out infinite}
+.app-shell.theme-glasswave-learn .metric-card,.app-shell.theme-glasswave-learn .dashboard-panel,.app-shell.theme-glasswave-learn .dashboard-analytics,.app-shell.theme-glasswave-learn .analytics-chart-card,.app-shell.theme-glasswave-learn .library-drive,.app-shell.theme-glasswave-learn .reports-browser,.app-shell.theme-glasswave-learn .students-browser,.app-shell.theme-glasswave-learn .memory-control,.app-shell.theme-glasswave-learn .create-panel,.app-shell.theme-glasswave-learn .editor-panel{border-color:#c9def7!important;background:rgba(255,255,255,.77)!important;box-shadow:0 15px 44px rgba(40,99,163,.1);backdrop-filter:blur(15px)}
+.app-shell.theme-glasswave-learn .metric-card__icon,.app-shell.theme-glasswave-learn .drive-name>i{background:linear-gradient(145deg,#ddfaff,#dfe8ff);color:#2672d7}
+.app-shell.theme-glasswave-learn .primary-action--dark{background:linear-gradient(115deg,#1769db,#5b5cf2);box-shadow:0 10px 24px rgba(43,102,208,.22)}
+.app-shell.theme-glasswave-learn .service-status{border-color:#bee6de;background:rgba(247,255,253,.9)}
+.app-shell.theme-glasswave-learn .drive-row--folder{background:#f4fbff}
+.app-shell.theme-glasswave-learn .drive-row:hover{background:#eaf7ff}
+
+.student-shell.theme-glasswave_learn,.student-shell.theme-glasswave-learn{--theme-bg:radial-gradient(circle at 84% 10%,#b8d4ff 0,transparent 38%),radial-gradient(circle at 12% 77%,#a8f1fb 0,transparent 37%),linear-gradient(135deg,#eefcff,#e3edff 61%,#f4ecff);--theme-ink:#12265b;--theme-card:rgba(255,255,255,.79);--theme-accent:#186fe9;--theme-action:#2469e9;--theme-action-ink:#fff}
+.student-shell.theme-glasswave_learn::before,.student-shell.theme-glasswave-learn::before{background:rgba(69,181,245,.17);filter:blur(14px)}
+.student-shell.theme-glasswave_learn::after,.student-shell.theme-glasswave-learn::after{background:rgba(127,113,244,.15);filter:blur(18px)}
+.student-shell.theme-glasswave_learn .student-top,.student-shell.theme-glasswave-learn .student-top{border-bottom:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.42);backdrop-filter:blur(18px)}
+.student-shell.theme-glasswave_learn .student-top .brand::after,.student-shell.theme-glasswave-learn .student-top .brand::after{align-self:center;border:1px solid #a9ddfa;border-radius:999px;padding:5px 10px;background:#e8faff;color:#1a6ccc;font-size:.64rem;font-weight:900;letter-spacing:.02em;content:"✺ GlassWave"}
+.student-shell.theme-glasswave_learn .student-question,.student-shell.theme-glasswave-learn .student-question,.student-shell.theme-glasswave_learn .study-card,.student-shell.theme-glasswave-learn .study-card{border-color:rgba(255,255,255,.9);box-shadow:0 25px 70px rgba(35,95,177,.17)}
+.student-shell.theme-glasswave_learn .student-progress span,.student-shell.theme-glasswave-learn .student-progress span{background:linear-gradient(90deg,#20cbec,#5c68f0)}
+.student-shell.theme-glasswave_learn .student-options label,.student-shell.theme-glasswave-learn .student-options label{border-color:rgba(153,209,248,.58);background:rgba(255,255,255,.68);box-shadow:0 9px 22px rgba(38,101,180,.06);backdrop-filter:blur(12px)}
+.student-shell.theme-glasswave_learn .student-options label.selected,.student-shell.theme-glasswave-learn .student-options label.selected{border-color:#3b92ed;background:#f8feff;box-shadow:0 0 0 4px rgba(72,169,239,.16),0 14px 28px rgba(44,104,187,.13)}
+
+/* A distinct GlassWave composition, shared by the real admin and student views. */
+.app-shell.theme-glasswave-learn .sidebar{background:radial-gradient(circle at 16% 4%,rgba(137,231,255,.55),transparent 26%),linear-gradient(165deg,rgba(255,255,255,.96),rgba(224,241,255,.91))}
+.app-shell.theme-glasswave-learn .nav-item{border-radius:18px}
+.app-shell.theme-glasswave-learn .nav-icon{filter:drop-shadow(0 3px 5px rgba(32,126,212,.18))}
+.app-shell.theme-glasswave-learn .hero-card{min-height:360px;border-radius:34px;background:radial-gradient(circle at 80% 18%,rgba(255,255,255,.85),transparent 24%),linear-gradient(120deg,#e7fcff 2%,#c3e5ff 52%,#bfbafa 100%)}
+.app-shell.theme-glasswave-learn .hero-card::before{right:-8%;bottom:-71%;width:79%;background:linear-gradient(110deg,rgba(255,255,255,.86),rgba(97,193,252,.26));transform:rotate(-8deg)}
+.app-shell.theme-glasswave-learn .hero-card__copy .eyebrow{display:inline-flex;align-items:center;border:1px solid #9fdaf9;border-radius:999px;padding:8px 13px;background:rgba(255,255,255,.6);color:#155dbd;letter-spacing:.09em}
+.app-shell.theme-glasswave-learn .hero-card h2{max-width:560px;color:#14336e;line-height:1.03;text-wrap:balance}
+.app-shell.theme-glasswave-learn .hero-card p:not(.eyebrow){max-width:530px;color:#45638f}
+.app-shell.theme-glasswave-learn .hero-card .primary-action{background:linear-gradient(110deg,#1679eb,#625bf2);box-shadow:0 13px 28px rgba(36,109,215,.24)}
+.app-shell.theme-glasswave-learn .hero-card__visual::before{position:absolute;width:214px;aspect-ratio:1;border:2px solid rgba(255,255,255,.72);border-radius:50%;box-shadow:0 0 0 21px rgba(255,255,255,.12),0 0 0 46px rgba(255,255,255,.08);content:"";animation:glasswave-breathe 7s ease-in-out infinite}
+.app-shell.theme-glasswave-learn .hero-card__visual::after{position:absolute;top:4%;left:18%;display:grid;width:55px;height:55px;place-items:center;border:1px solid rgba(255,255,255,.8);border-radius:18px;background:rgba(255,255,255,.66);color:#2766d7;font-size:1.6rem;box-shadow:0 14px 35px rgba(35,112,206,.16);content:"✦";animation:glasswave-lift 6s ease-in-out infinite reverse}
+.app-shell.theme-glasswave-learn .hero-card__visual>b{color:#2353a6}
+.app-shell.theme-glasswave-learn .metric-card{border-radius:24px;background:linear-gradient(145deg,rgba(255,255,255,.91),rgba(239,250,255,.75))}
+.app-shell.theme-glasswave-learn .metric-card__icon{border:1px solid rgba(255,255,255,.9);border-radius:18px;box-shadow:0 9px 22px rgba(39,129,217,.1)}
+.app-shell.theme-glasswave-learn .dashboard-analytics,.app-shell.theme-glasswave-learn .library-drive,.app-shell.theme-glasswave-learn .reports-browser,.app-shell.theme-glasswave-learn .students-browser{border-radius:30px!important}
+.app-shell.theme-glasswave-learn .analytics-chart-card{background:linear-gradient(165deg,rgba(255,255,255,.9),rgba(239,250,255,.77))!important}
+.premium-auth.theme-glasswave-learn{background:linear-gradient(145deg,#fcfeff,#f1f9ff)}
+.premium-auth.theme-glasswave-learn .learning-landscape{background:radial-gradient(circle at 72% 17%,rgba(255,255,255,.78),transparent 23%),linear-gradient(150deg,#dffaff,#badfff 51%,#aaaafa)}
+.premium-auth.theme-glasswave-learn .learning-landscape__copy>span{border-color:#c9efff;background:rgba(255,255,255,.6);color:#1c65bf}
+.premium-auth.theme-glasswave-learn .learning-landscape__copy h2{color:#183b80}
+.premium-auth.theme-glasswave-learn .learning-hill--back{background:linear-gradient(#a5d7ff,#829fe8)}
+.premium-auth.theme-glasswave-learn .learning-hill--front{background:linear-gradient(150deg,#579ddf,#625bcb)}
+.premium-auth.theme-glasswave-learn .learning-book i{background:linear-gradient(145deg,#fff,#d8f8ff 68%,#b2c8ff)}
+.premium-auth.theme-glasswave-learn .login-card .eyebrow{color:#2069ce}
+.student-shell.theme-glasswave_learn .student-stage::before,.student-shell.theme-glasswave-learn .student-stage::before{display:inline-flex;align-items:center;margin:0 0 16px;border:1px solid rgba(255,255,255,.9);border-radius:999px;padding:8px 14px;background:rgba(255,255,255,.68);color:#2767c4;font-size:.7rem;font-weight:900;letter-spacing:.12em;box-shadow:0 8px 20px rgba(34,110,201,.09);content:"✦  GLASSWAVE LEARN"}
+.student-shell.theme-glasswave_learn .student-question,.student-shell.theme-glasswave-learn .student-question{border-radius:32px;background:linear-gradient(155deg,rgba(255,255,255,.93),rgba(240,250,255,.83));backdrop-filter:blur(24px)}
+.student-shell.theme-glasswave_learn .student-question__meta,.student-shell.theme-glasswave-learn .student-question__meta{border-bottom:1px solid #d8eafa;padding-bottom:13px;color:#226bd1}
+.student-shell.theme-glasswave_learn .student-options b,.student-shell.theme-glasswave-learn .student-options b{border-radius:12px;background:linear-gradient(145deg,#d8faff,#e4e7ff)}
+.student-shell.theme-glasswave_learn .quiz-nav>button,.student-shell.theme-glasswave_learn .page-dots button,.student-shell.theme-glasswave-learn .quiz-nav>button,.student-shell.theme-glasswave-learn .page-dots button{border:1px solid rgba(255,255,255,.92);border-radius:14px;box-shadow:0 8px 23px rgba(34,101,177,.09)}
+.student-shell.theme-glasswave_learn .quiz-nav .submit-teacher,.student-shell.theme-glasswave-learn .quiz-nav .submit-teacher{border-color:#286de9;background:linear-gradient(110deg,#167ee7,#615af0);color:#fff}
+@keyframes glasswave-breathe{50%{transform:scale(1.08);opacity:.72}}
+@keyframes glasswave-lift{0%,100%{transform:translateY(0) rotate(-7deg)}50%{transform:translateY(-10px) rotate(-3deg)}}
+@media(max-width:760px){.studio-status,.studio-preview-heading{align-items:stretch;flex-direction:column}.studio-status button{width:100%}.studio-preview-nav span:last-child{max-width:45%;text-align:right}.studio-preview-cards{grid-template-columns:1fr 1fr}.studio-preview-body{padding-bottom:24px}.glasswave-experience-badge{display:none}}
+@media(max-width:440px){.studio-preview-cards{grid-template-columns:1fr}.studio-preview--student .studio-preview-cards{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.theme-card .theme-orb,.studio-preview::before,.studio-preview::after,.app-shell.theme-glasswave-learn .hero-card__visual>span,.app-shell.theme-glasswave-learn .hero-card__visual::before,.app-shell.theme-glasswave-learn .hero-card__visual::after{animation:none!important}}

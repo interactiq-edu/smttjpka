@@ -94,10 +94,10 @@ export function RichTextEditor({ value, onChange, onUploadImage, mode = 'full', 
   });
 
   useEffect(() => {
-    if (editor && JSON.stringify(editor.getJSON()) !== JSON.stringify(value)) editor.commands.setContent(value.content.length ? value : emptyDocument, { emitUpdate: false });
+    if (editor && !editor.isDestroyed && JSON.stringify(editor.getJSON()) !== JSON.stringify(value)) editor.commands.setContent(value.content.length ? value : emptyDocument, { emitUpdate: false });
   }, [editor, value]);
 
-  if (!editor) return null;
+  if (!editor || editor.isDestroyed) return null;
   const command = (callback: () => void) => () => { callback(); editor.chain().focus().run(); };
   const addLink = () => {
     const href = window.prompt('Enter an https:// or http:// URL');

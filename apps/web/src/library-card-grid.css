@@ -1,0 +1,46 @@
+.app-shell.glasswave-layout .library-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:18px;min-width:0;margin-top:20px}
+.app-shell.glasswave-layout .library-visual-card{min-width:0;overflow:hidden;border:1px solid #d7e5fa;border-radius:21px;background:#fff;box-shadow:0 13px 28px rgba(47,100,177,.1);transition:transform .18s ease,box-shadow .18s ease}
+.app-shell.glasswave-layout .library-visual-card:hover{transform:translateY(-3px);box-shadow:0 19px 38px rgba(47,100,177,.16)}
+.app-shell.glasswave-layout .library-visual-card:focus-within{outline:2px solid #5ca7ed;outline-offset:2px}
+.app-shell.glasswave-layout .library-visual-cover{position:relative;display:grid;min-height:145px;place-items:center;overflow:hidden;background:linear-gradient(135deg,var(--cover-start,#c9eaff),var(--cover-end,#376af2));isolation:isolate}
+.app-shell.glasswave-layout .library-visual-cover::before{position:absolute;z-index:-1;right:-20%;bottom:-75%;width:85%;aspect-ratio:1;border:1px solid rgba(255,255,255,.62);border-radius:50%;background:rgba(255,255,255,.17);box-shadow:0 0 0 20px rgba(255,255,255,.1),0 0 0 42px rgba(255,255,255,.07);content:""}
+.app-shell.glasswave-layout .library-visual-cover--folder{background:linear-gradient(135deg,#fff2c7,#ffb65d)}
+.app-shell.glasswave-layout .library-visual-cover__symbol{filter:drop-shadow(0 12px 15px rgba(31,43,86,.24));font-size:4.5rem;line-height:1;user-select:none}
+.app-shell.glasswave-layout .library-cover-caption{position:absolute;bottom:11px;left:12px;border:1px solid rgba(255,255,255,.5);border-radius:999px;padding:4px 9px;background:rgba(255,255,255,.83);color:#16336e;font-size:.64rem;font-weight:850}
+.app-shell.glasswave-layout .library-visual-more{position:absolute;top:9px;right:9px;display:grid;width:31px;height:31px;place-items:center;border:1px solid rgba(255,255,255,.76);border-radius:10px;background:rgba(255,255,255,.9);color:#2b4e91;font-size:1.35rem;line-height:1;cursor:pointer}
+.app-shell.glasswave-layout .library-visual-badge-button{position:absolute;right:9px;bottom:9px;border:1px solid rgba(255,255,255,.7);border-radius:9px;padding:5px 8px;background:rgba(255,255,255,.91);color:#2858aa;font:inherit;font-size:.62rem;font-weight:850;cursor:pointer}
+.app-shell.glasswave-layout .library-visual-card__body{display:grid;gap:5px;min-height:110px;padding:12px 13px 13px;color:#526789;font-size:.67rem}
+.app-shell.glasswave-layout .library-card-title{display:block;max-width:100%;border:0;padding:0;background:transparent;color:#162956;font:inherit;font-size:.83rem;font-weight:850;line-height:1.25;text-align:left;overflow-wrap:anywhere;cursor:pointer}
+.app-shell.glasswave-layout .library-card-title:hover{text-decoration:underline}
+.app-shell.glasswave-layout .library-card-footer{display:flex;align-items:center;justify-content:space-between;gap:7px;margin-top:auto}
+.app-shell.glasswave-layout .library-card-footer small{font-size:.63rem}
+.app-shell.glasswave-layout .library-visual-card--folder .library-visual-card__body small{color:#6c7f9e}
+.library-drive:has(.dialog-backdrop),.library-drive:has(.library-context-menu){backdrop-filter:none!important}
+.library-drive .dialog-backdrop{z-index:60}
+.app-shell>.library-folder-backdrop{z-index:60}
+.library-drive .drive-details{overflow-x:auto}
+.drive-badge-button{display:grid;width:34px;height:34px;flex:0 0 auto;place-items:center;border:0;border-radius:9px;background:#eeeaff;color:#4c41b6;font:inherit;font-size:1.1rem;cursor:pointer}
+.drive-badge-button:hover,.drive-badge-button:focus-visible{outline:2px solid #8c80e6;outline-offset:2px;background:#e4deff}
+.library-badge-dialog{box-sizing:border-box;width:min(100%,850px);max-width:calc(100vw - 44px);max-height:min(90dvh,850px);min-width:0;overflow:auto}
+.library-badge-dialog>p:not(.eyebrow){max-width:650px}
+.library-badge-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px;max-height:53dvh;overflow:auto;padding:3px}
+.library-badge-options button{min-width:0;border:2px solid transparent;border-radius:14px;padding:5px;background:#f8f6fc;color:#30294d;font:inherit;font-size:.68rem;font-weight:760;cursor:pointer}
+.library-badge-options button:hover,.library-badge-options button:focus-visible{border-color:#9383ee}
+.library-badge-options button.is-selected{border-color:#6550d7;background:#eeeaff}
+.library-badge-swatch{display:grid;min-height:73px;place-items:center;margin-bottom:5px;border-radius:10px;background:linear-gradient(135deg,var(--cover-start),var(--cover-end));font-size:2.2rem}
+.app-shell.glasswave-layout .library-badge-dialog{width:min(100%,850px);max-width:calc(100vw - 44px)}
+.app-shell.glasswave-layout .library-badge-dialog>p:not(.eyebrow){max-width:650px;color:#5c6d89;font-size:.78rem}
+.app-shell.glasswave-layout .library-badge-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px;max-height:53dvh;overflow:auto;padding:3px}
+.app-shell.glasswave-layout .library-badge-options button{min-width:0;border:2px solid transparent;border-radius:14px;padding:5px;background:#f8fbff;color:#26385e;font:inherit;font-size:.68rem;font-weight:760;cursor:pointer}
+.app-shell.glasswave-layout .library-badge-options button:hover,.app-shell.glasswave-layout .library-badge-options button:focus-visible{border-color:#7bb9f7}
+.app-shell.glasswave-layout .library-badge-options button.is-selected{border-color:#396deb;background:#eef5ff}
+.app-shell.glasswave-layout .library-badge-swatch{display:grid;min-height:73px;place-items:center;margin-bottom:5px;border-radius:10px;background:linear-gradient(135deg,var(--cover-start),var(--cover-end));font-size:2.2rem}
+.app-shell.glasswave-layout .library-move-dialog{width:min(94vw,510px)}
+.app-shell.glasswave-layout .library-destination-list{display:grid;gap:7px;max-height:50dvh;overflow:auto;margin-top:15px}
+.app-shell.glasswave-layout .library-destination-list button{border:1px solid #dbe6f5;border-radius:11px;padding:11px;background:#f9fcff;color:#1c407d;font:inherit;font-size:.78rem;font-weight:750;text-align:left;cursor:pointer}
+.app-shell.glasswave-layout .library-destination-list button:hover{background:#eaf5ff}
+.app-shell.glasswave-layout .library-destination-list button:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:1100px){.library-drive .library-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.library-drive .library-filters{grid-template-columns:minmax(0,1fr)}.library-badge-options{grid-template-columns:repeat(3,minmax(0,1fr))}.app-shell.glasswave-layout .library-card-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.app-shell.glasswave-layout .library-visual-cover{min-height:116px}.app-shell.glasswave-layout .library-visual-cover__symbol{font-size:3rem}.app-shell.glasswave-layout .library-badge-options{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:440px){.app-shell.glasswave-layout .library-card-grid{grid-template-columns:minmax(0,1fr)}.app-shell.glasswave-layout .library-visual-badge-button{font-size:.62rem}.app-shell.glasswave-layout .library-cover-caption{max-width:65%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.app-shell.glasswave-layout .library-visual-card__body{padding:12px}}
+@media(prefers-reduced-motion:reduce){.app-shell.glasswave-layout .library-visual-card{transition:none}}

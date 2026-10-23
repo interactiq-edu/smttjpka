@@ -1,0 +1,227 @@
+/* GlassWave's app-shell and dashboard layout are opt-in. Classic themes keep their markup and layout. */
+.app-shell.glasswave-layout,
+.app-shell.glasswave-layout:has(.sidebar:hover),
+.app-shell.glasswave-layout:has(.sidebar:focus-within){
+  grid-template-columns:272px minmax(0,1fr);
+  background:#eef6ff;
+}
+.app-shell.glasswave-layout--compact,
+.app-shell.glasswave-layout--compact:has(.sidebar:hover),
+.app-shell.glasswave-layout--compact:has(.sidebar:focus-within){grid-template-columns:88px minmax(0,1fr)}
+.app-shell.glasswave-layout .sidebar{
+  position:sticky;
+  top:0;
+  display:flex;
+  height:100dvh;
+  min-height:580px;
+  flex-direction:column;
+  gap:0;
+  overflow-x:hidden;
+  overflow-y:auto;
+  padding:24px 14px 18px;
+  border-right:1px solid rgba(169,211,243,.72);
+  background:linear-gradient(155deg,rgba(255,255,255,.94),rgba(231,245,255,.92) 54%,rgba(232,236,255,.94));
+  box-shadow:12px 0 42px rgba(28,87,168,.08);
+  backdrop-filter:blur(24px);
+}
+.glasswave-sidebar-head{display:flex;min-height:58px;align-items:center;gap:4px;margin-bottom:26px}
+.glasswave-sidebar-head .brand-button{min-width:0;flex:1}
+.glasswave-sidebar-head .brand-copy,
+.glasswave-layout .sidebar .nav-label{opacity:1;transform:none}
+.glasswave-sidebar-head .brand-copy b{font-size:1.08rem}
+.glasswave-sidebar-toggle{
+  display:grid;width:30px;height:30px;flex:0 0 30px;place-items:center;
+  border:1px solid #cfe3fb;border-radius:11px;background:rgba(255,255,255,.8);
+  color:#34599c;cursor:pointer;font-size:1.5rem;line-height:1;
+}
+.glasswave-sidebar-toggle:hover,.glasswave-sidebar-toggle:focus-visible{border-color:#6abaf1;background:#eafaff}
+.glasswave-nav-heading{margin:0 8px 11px;color:#5776aa;font-size:.63rem;font-weight:900;letter-spacing:.15em;text-transform:uppercase;white-space:nowrap}
+.glasswave-nav-heading--inside{margin:21px 8px 8px}
+.glasswave-layout .nav-list{display:grid;gap:4px;overflow:visible}
+.app-shell.glasswave-layout .nav-item{
+  min-height:50px;gap:11px;border:1px solid transparent;border-radius:16px;
+  padding:5px 10px;color:#365273;font-size:.81rem;font-weight:730;
+  white-space:nowrap;
+}
+.app-shell.glasswave-layout .nav-item:hover{transform:translateX(2px);border-color:#b5dffa;background:rgba(255,255,255,.78);color:#1458b4;box-shadow:0 10px 23px rgba(32,111,199,.1)}
+.glasswave-layout .nav-item::after{display:none}
+.app-shell.glasswave-layout .nav-item[aria-current="page"]{
+  border-color:#90cbff;background:linear-gradient(110deg,#e5faff,#dce9ff);
+  color:#114da8;box-shadow:0 9px 23px rgba(39,117,218,.16);
+}
+.glasswave-layout .nav-item[aria-current="page"]::before{position:absolute;top:12px;bottom:12px;left:0;width:3px;border-radius:0 4px 4px 0;background:#386cf0;content:""}
+.glasswave-nav-icon-wrap{display:grid;width:37px;height:37px;flex:0 0 37px;place-items:center;border:1px solid #dbeafa;border-radius:12px;background:rgba(255,255,255,.75);box-shadow:0 5px 13px rgba(36,111,199,.07)}
+.glasswave-layout .nav-item[aria-current="page"] .glasswave-nav-icon-wrap{border-color:#94c8ff;background:linear-gradient(145deg,#fff,#d8ecff);color:#2166ce}
+.glasswave-layout .nav-icon{width:20px;height:20px}
+.glasswave-layout .settings-link{display:flex;margin-top:auto}
+.glasswave-sidebar-foot{display:flex;align-items:center;gap:10px;margin-top:12px;border:1px solid #d9e7fa;border-radius:18px;padding:12px;background:rgba(255,255,255,.58);color:#254a92;font-size:.72rem;font-weight:850;white-space:nowrap}
+.glasswave-sidebar-foot__mark{display:grid;width:28px;height:28px;flex:0 0 28px;place-items:center;border-radius:9px;background:#e2f9ff;color:#2775d1;font-size:1.25rem}
+.glasswave-sidebar-foot small{display:block;margin-top:3px;color:#6780a9;font-size:.63rem;font-weight:650}
+.glasswave-layout--compact .glasswave-sidebar-head{justify-content:center;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.glasswave-layout--compact .glasswave-sidebar-head .brand-button{flex:0 0 48px}
+.glasswave-layout--compact .glasswave-sidebar-toggle{width:36px;flex-basis:36px}
+.glasswave-layout--compact .sidebar .brand-copy,
+.glasswave-layout--compact .sidebar .nav-label,
+.glasswave-layout--compact .glasswave-nav-heading,
+.glasswave-layout--compact .glasswave-sidebar-foot>span:last-child{display:none}
+.glasswave-layout--compact .nav-item{justify-content:center;padding:6px}
+.glasswave-layout--compact .glasswave-nav-icon-wrap{width:42px;height:42px;flex-basis:42px}
+.glasswave-layout--compact .glasswave-sidebar-foot{justify-content:center;padding:7px}
+.app-shell.glasswave-layout .workspace{min-width:0;background:radial-gradient(circle at 83% 5%,rgba(179,211,255,.35),transparent 30%),linear-gradient(160deg,#f7fbff,#edf5ff 65%,#f4f1ff)}
+.app-shell.glasswave-layout .topbar{
+  position:sticky;top:12px;z-index:20;min-height:80px;margin:12px 22px 0;
+  border:1px solid rgba(190,217,244,.9);border-radius:22px;
+  padding:13px clamp(18px,2.3vw,35px);background:rgba(255,255,255,.82);
+  box-shadow:0 12px 32px rgba(37,102,177,.09);backdrop-filter:blur(22px);
+}
+.glasswave-topbar-title{display:flex;min-width:0;align-items:center;gap:12px}
+.glasswave-desktop-toggle{display:inline-flex;min-height:37px;flex:0 0 auto;align-items:center;gap:7px;border:1px solid #bad7f8;border-radius:11px;padding:7px 11px;background:#eef7ff;color:#235da9;font:inherit;font-size:.7rem;font-weight:850;white-space:nowrap;cursor:pointer}
+.glasswave-desktop-toggle:hover,.glasswave-desktop-toggle:focus-visible{border-color:#6fb7f4;background:#dff1ff;outline-offset:2px}
+.glasswave-desktop-toggle>span{font-size:1rem;line-height:1}
+.glasswave-topbar-title h1{overflow:hidden;margin:3px 0 0;color:#11265a;font-size:clamp(1.25rem,2.1vw,1.8rem);text-overflow:ellipsis;white-space:nowrap}
+.glasswave-breadcrumb{overflow:hidden;margin:0;color:#5572a0;font-size:.68rem;font-weight:790;letter-spacing:.05em;text-overflow:ellipsis;white-space:nowrap}
+.glasswave-breadcrumb span{margin:0 5px;color:#83a4d1}
+.glasswave-layout .topbar-actions{min-width:0;gap:11px}
+.app-shell.glasswave-layout .service-status{border-color:#bcdfd9;background:rgba(245,255,251,.86);color:#30685f;box-shadow:none;white-space:nowrap}
+.glasswave-profile{display:flex;min-width:0;align-items:center;gap:9px;border-left:1px solid #d5e5f5;padding-left:14px}
+.glasswave-profile__avatar{display:grid;width:38px;height:38px;flex:0 0 38px;place-items:center;border:2px solid #fff;border-radius:13px;background:linear-gradient(135deg,#5bbef7,#6869ec);color:white;font-size:.74rem;font-weight:900;box-shadow:0 7px 17px rgba(46,106,207,.22)}
+.glasswave-profile__name{display:block;max-width:120px;overflow:hidden;color:#182c56;font-size:.72rem;font-weight:850;text-overflow:ellipsis;white-space:nowrap}
+.glasswave-profile__name small{display:block;color:#7285a5;font-size:.62rem;font-weight:650}
+.glasswave-layout .topbar .text-action{border:1px solid #d6e7f8;border-radius:11px;background:#f7fbff;color:#37588e;font-size:.7rem;font-weight:820;white-space:nowrap}
+.glasswave-mobile-toggle,.glasswave-nav-scrim{display:none}
+.glasswave-layout .content{width:min(100%,1660px);max-width:none;padding:clamp(20px,2.7vw,42px)}
+
+.glasswave-dashboard{display:grid;gap:23px;min-width:0}
+.glasswave-dashboard-lead{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(245px,.68fr);gap:18px;align-items:stretch}
+.glasswave-dashboard-hero{position:relative;isolation:isolate;min-height:325px;overflow:hidden;border:1px solid #a9d6fa;border-radius:30px;padding:clamp(27px,3.7vw,50px);background:radial-gradient(circle at 75% 7%,#f7feff 0,transparent 25%),linear-gradient(115deg,#e6f9ff 0%,#cbe5ff 55%,#c9c9ff 100%);box-shadow:0 25px 60px rgba(31,106,191,.14)}
+.glasswave-dashboard-hero::before{position:absolute;z-index:-1;right:-12%;bottom:-60%;width:80%;aspect-ratio:1;border:1px solid rgba(255,255,255,.45);border-radius:50%;background:linear-gradient(120deg,rgba(255,255,255,.46),transparent);box-shadow:0 0 0 28px rgba(255,255,255,.12),0 0 0 58px rgba(255,255,255,.08);content:""}
+.glasswave-dashboard-kicker{display:inline-flex;align-items:center;gap:8px;border:1px solid #a6dcfa;border-radius:999px;padding:7px 12px;background:rgba(255,255,255,.72);color:#1b60b6;font-size:.67rem;font-weight:860;letter-spacing:.04em}
+.glasswave-dashboard-kicker svg{width:15px;height:15px}
+.glasswave-dashboard-hero h2{position:relative;z-index:1;max-width:590px;margin:16px 0 12px;color:#112361;font-size:clamp(2rem,4vw,4rem);letter-spacing:-.06em;line-height:1.02;text-wrap:balance}
+.glasswave-dashboard-hero>p{position:relative;z-index:1;max-width:500px;margin:0;color:#3d5b89;font-size:.88rem;line-height:1.62}
+.glasswave-dashboard-hero__actions{position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+.glasswave-dashboard-hero__actions button{display:inline-flex;min-height:44px;align-items:center;justify-content:center;gap:8px;border-radius:13px;font-size:.77rem;font-weight:850;cursor:pointer}
+.glasswave-dashboard-hero__actions svg{width:17px;height:17px}
+.glasswave-dashboard-hero__actions .primary-action{border:0;padding:11px 17px;background:linear-gradient(105deg,#236cef,#5a4eeb);color:#fff;box-shadow:0 12px 24px rgba(46,103,214,.25)}
+.glasswave-secondary-action{border:1px solid rgba(255,255,255,.85);padding:10px 15px;background:rgba(255,255,255,.7);color:#2255a4}
+.glasswave-dashboard-hero__actions button:hover{transform:translateY(-2px)}
+.glasswave-dashboard-hero__facts{position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:18px;margin-top:25px;color:#3b5787;font-size:.72rem}
+.glasswave-dashboard-hero__facts span{display:flex;align-items:center;gap:5px}
+.glasswave-dashboard-hero__facts svg{width:16px;height:16px;color:#2b73d2}
+.glasswave-dashboard-hero__facts b{color:#16346e;font-size:.89rem}
+.glasswave-dashboard-hero__art{position:absolute;right:2%;bottom:4%;width:30%;height:65%;pointer-events:none}
+.glasswave-dashboard-orb{position:absolute;display:grid;place-items:center;border:1px solid rgba(255,255,255,.94);border-radius:26px;background:linear-gradient(145deg,rgba(255,255,255,.85),rgba(186,231,255,.63));color:#376fe0;box-shadow:0 20px 35px rgba(36,91,173,.18);transform:rotate(-8deg)}
+.glasswave-dashboard-orb svg{width:52%;height:52%}
+.glasswave-dashboard-orb--book{right:20%;bottom:8%;width:120px;height:120px}
+.glasswave-dashboard-orb--spark{top:1%;left:4%;width:59px;height:59px;transform:rotate(12deg)}
+.glasswave-dashboard-orb--report{top:5%;right:0;width:67px;height:67px;transform:rotate(8deg)}
+.glasswave-dashboard-side{display:grid;grid-template-rows:1fr 1fr;gap:18px;min-width:0}
+.glasswave-feature-card{display:flex;min-width:0;align-items:flex-start;gap:15px;border:1px solid #cce0f5;border-radius:26px;padding:23px;background:rgba(255,255,255,.76);box-shadow:0 17px 39px rgba(43,101,173,.1);text-align:left;cursor:pointer;transition:transform .18s ease,box-shadow .18s ease}
+.glasswave-feature-card:hover{transform:translateY(-3px);box-shadow:0 20px 46px rgba(43,101,173,.16)}
+.glasswave-feature-card--review{background:linear-gradient(135deg,#fff,#f6f2ff)}
+.glasswave-feature-card--published{background:linear-gradient(135deg,#fff,#edfbff)}
+.glasswave-feature-card__icon{display:grid;width:48px;height:48px;flex:0 0 48px;place-items:center;border-radius:16px;background:#eae6ff;color:#6254d4}
+.glasswave-feature-card--published .glasswave-feature-card__icon{background:#dcf7f5;color:#148c85}
+.glasswave-feature-card__icon svg{width:25px;height:25px}
+.glasswave-feature-card>span:last-child{display:grid;min-width:0;gap:7px}
+.glasswave-feature-card small{color:#62779a;font-size:.69rem;font-weight:730}
+.glasswave-feature-card strong{color:#152962;font-size:clamp(1.1rem,1.55vw,1.45rem);line-height:1.12}
+.glasswave-feature-card em{color:#2864c6;font-size:.68rem;font-style:normal;font-weight:850}
+.glasswave-dashboard-shortcuts{display:grid;grid-template-columns:minmax(170px,.65fr) minmax(0,2.35fr);align-items:center;gap:20px;border:1px solid #d2e3f7;border-radius:25px;padding:19px 23px;background:rgba(255,255,255,.8);box-shadow:0 13px 32px rgba(43,101,173,.07)}
+.glasswave-dashboard-shortcuts .eyebrow{margin:0;color:#3264b8;font-size:.58rem}
+.glasswave-dashboard-shortcuts h3{margin:4px 0 0;color:#1b3164;font-size:1.08rem}
+.glasswave-dashboard-shortcuts__links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.glasswave-dashboard-shortcuts__links button{display:flex;min-width:0;min-height:56px;align-items:center;gap:9px;border:1px solid #d8e7f8;border-radius:16px;padding:8px 10px;background:linear-gradient(125deg,#fff,#f3faff);color:#29477b;font-size:.7rem;font-weight:850;text-align:left;cursor:pointer}
+.glasswave-dashboard-shortcuts__links button:hover{border-color:#8fc9f6;background:#eaf8ff}
+.glasswave-dashboard-shortcuts__links button>span{display:grid;width:32px;height:32px;flex:0 0 32px;place-items:center;border-radius:11px;background:#e4efff;color:#2869cb}
+.glasswave-dashboard-shortcuts__links svg{width:18px;height:18px}
+.glasswave-dashboard-shortcuts__links b{margin-left:auto;font-size:1rem}
+.glasswave-dashboard .glasswave-metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:0}
+.glasswave-dashboard .glasswave-metric-grid .metric-card{min-height:100px;border-radius:22px;padding:17px;background:rgba(255,255,255,.84)!important}
+.glasswave-dashboard .glasswave-metric-grid .metric-card:nth-child(2){background:linear-gradient(135deg,#f7fffd,#e9f8f6)!important}
+.glasswave-dashboard .glasswave-metric-grid .metric-card:nth-child(3){background:linear-gradient(135deg,#fffaf6,#fff1e8)!important}
+.glasswave-dashboard .glasswave-metric-grid .metric-card:nth-child(4){background:linear-gradient(135deg,#f8faff,#edf3ff)!important}
+.app-shell.glasswave-layout .glasswave-dashboard .dashboard-analytics{margin:0;border-radius:28px!important;padding:clamp(18px,2.4vw,30px);background:rgba(255,255,255,.76)!important}
+.glasswave-dashboard .analytics-chart-grid{grid-template-columns:repeat(12,minmax(0,1fr))!important;gap:15px}
+.glasswave-dashboard .submission-trend-card{grid-column:span 5!important;order:1}
+.glasswave-dashboard .review-chart-card{grid-column:span 3!important;order:2}
+.glasswave-dashboard .class-performance-card{grid-column:span 4!important;order:3}
+.glasswave-dashboard .analytics-chart-card--wide{grid-column:span 6!important;order:4}
+.glasswave-dashboard .top-students-card{grid-column:span 6!important;order:5}
+.app-shell.glasswave-layout .glasswave-dashboard .analytics-chart-card{border-radius:22px!important;padding:20px;background:linear-gradient(145deg,#fff,#f6fbff)!important}
+.glasswave-dashboard .analytics-chart-card header>span{background:#e9f1ff;color:#2d5eb8}
+.glasswave-dashboard .dashboard-panel{margin:0}
+.glasswave-layout :is(button,a,input,select,textarea):focus-visible{outline:3px solid #3c73e6;outline-offset:3px}
+
+@media(max-width:1380px){
+  .glasswave-layout .glasswave-experience-badge{display:none}
+  .glasswave-dashboard-lead{grid-template-columns:minmax(0,1.45fr) minmax(215px,.7fr)}
+  .glasswave-dashboard-hero__art{opacity:.45}
+}
+@media(max-width:1100px){
+  .glasswave-layout .glasswave-profile__name{display:none}
+  .glasswave-dashboard-lead{grid-template-columns:minmax(0,1fr)}
+  .glasswave-dashboard-side{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto}
+  .glasswave-dashboard .glasswave-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .glasswave-dashboard .analytics-chart-card{grid-column:span 6!important}
+  .glasswave-dashboard .review-chart-card{grid-column:span 6!important}
+  .glasswave-dashboard .analytics-chart-card--wide,.glasswave-dashboard .top-students-card{grid-column:span 6!important}
+}
+@media(max-width:850px){
+  .glasswave-dashboard-shortcuts{grid-template-columns:1fr}
+  .glasswave-dashboard .analytics-chart-card{grid-column:1/-1!important}
+}
+@media(max-width:760px){
+  .app-shell.glasswave-layout,.app-shell.glasswave-layout:has(.sidebar:hover),.app-shell.glasswave-layout:has(.sidebar:focus-within),
+  .app-shell.glasswave-layout--compact,.app-shell.glasswave-layout--compact:has(.sidebar:hover),.app-shell.glasswave-layout--compact:has(.sidebar:focus-within){display:block}
+  .app-shell.glasswave-layout .sidebar{
+    position:fixed;z-index:101;top:0;right:auto;bottom:0;left:0;display:flex;
+    width:min(84vw,310px)!important;height:100dvh;min-height:0;flex-direction:column;
+    overflow-y:auto;padding:19px 14px;transform:translateX(-110%);
+    transition:transform .23s ease;
+  }
+  .app-shell.glasswave-layout--mobile-open .sidebar{transform:translateX(0)}
+  .glasswave-layout .sidebar .brand-copy,.glasswave-layout .sidebar .nav-label,
+  .glasswave-layout--compact .sidebar .brand-copy,.glasswave-layout--compact .sidebar .nav-label,
+  .glasswave-layout--compact .glasswave-nav-heading,
+  .glasswave-layout--compact .glasswave-sidebar-foot>span:last-child{display:grid;opacity:1}
+  .app-shell.glasswave-layout .sidebar .nav-label{display:inline!important}
+  .glasswave-layout .nav-list{display:grid;width:100%;overflow:visible}
+  .glasswave-layout .nav-item,.glasswave-layout--compact .nav-item{width:100%;justify-content:flex-start}
+  .glasswave-layout .settings-link{display:flex}
+  .glasswave-layout .glasswave-sidebar-head{justify-content:space-between;flex-wrap:nowrap}
+  .glasswave-layout .glasswave-sidebar-head .brand-button{display:flex;flex:1}
+  .glasswave-layout .glasswave-sidebar-toggle{display:none}
+  .glasswave-nav-scrim{position:fixed;z-index:100;inset:0;display:block;width:100%;border:0;background:rgba(17,36,76,.45);backdrop-filter:blur(3px)}
+  .glasswave-mobile-toggle{display:grid;width:40px;height:40px;flex:0 0 40px;place-items:center;border:1px solid #bddcf8;border-radius:12px;background:#f3faff;color:#2059b5;font-size:1.1rem;cursor:pointer}
+  .glasswave-desktop-toggle{display:none}
+  .app-shell.glasswave-layout .topbar{top:0;min-height:68px;margin:0;border-radius:0;padding:11px 15px}
+  .glasswave-layout .topbar-actions{gap:6px}
+  .glasswave-layout .glasswave-profile{display:none}
+  .glasswave-layout .service-status{display:none}
+  .glasswave-layout .content{padding:18px 13px 35px}
+  .glasswave-dashboard{gap:15px}
+  .glasswave-dashboard-hero{min-height:0;padding:28px 22px}
+  .glasswave-dashboard-hero h2{max-width:100%;font-size:clamp(2.1rem,9vw,3.3rem)}
+  .glasswave-dashboard-hero>p{font-size:.82rem}
+  .glasswave-dashboard-hero__art{display:none}
+  .glasswave-dashboard-side{gap:10px}
+  .glasswave-feature-card{gap:9px;padding:16px}
+  .glasswave-feature-card__icon{width:36px;height:36px;flex-basis:36px}
+  .glasswave-feature-card__icon svg{width:20px;height:20px}
+  .glasswave-dashboard-shortcuts{padding:17px}
+  .glasswave-dashboard-shortcuts__links{grid-template-columns:1fr}
+  .glasswave-dashboard .analytics-chart-grid{grid-template-columns:minmax(0,1fr)!important}
+  .glasswave-dashboard .analytics-chart-card{grid-column:1!important}
+}
+@media(max-width:480px){
+  .glasswave-dashboard-side{grid-template-columns:1fr}
+  .glasswave-dashboard .glasswave-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .glasswave-dashboard .glasswave-metric-grid .metric-card{min-height:92px;gap:8px;padding:12px}
+  .glasswave-dashboard .glasswave-metric-grid .metric-card__icon{width:36px;height:36px;flex-basis:36px}
+  .glasswave-dashboard .glasswave-metric-grid .metric-card strong{font-size:1.3rem}
+  .glasswave-dashboard .glasswave-metric-grid .metric-card p{font-size:.65rem}
+  .glasswave-dashboard-hero__actions{display:grid}
+  .glasswave-dashboard-hero__actions button{width:100%}
+}
+@media(prefers-reduced-motion:reduce){.glasswave-layout .sidebar,.glasswave-feature-card,.glasswave-dashboard-hero__actions button{transition:none!important}}

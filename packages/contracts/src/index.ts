@@ -82,7 +82,8 @@ export type AuthSessionResponse = ApiResponse<AuthSessionData>;
 export type ResourceType = 'QUIZ' | 'ASSESSMENT' | 'FLASHCARD_SET' | 'PRESENTATION' | 'PASSAGE' | 'INTERACTIVE_VIDEO';
 export type ResourceStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 export type ResourceVisibility = 'PRIVATE' | 'TENANT' | 'PUBLIC';
-export type QuizTheme = 'AURORA' | 'OCEAN' | 'SUNSET' | 'FOREST' | 'GALAXY' | 'CANDY' | 'NEON' | 'PAPER' | 'SAFARI' | 'MIDNIGHT';
+export const QUIZ_THEME_IDS = ['AURORA', 'OCEAN', 'SUNSET', 'FOREST', 'GALAXY', 'CANDY', 'NEON', 'PAPER', 'SAFARI', 'MIDNIGHT', 'GLASSWAVE_LEARN'] as const;
+export type QuizTheme = typeof QUIZ_THEME_IDS[number];
 export type AttemptPolicy = 'ONCE_PER_EMAIL' | 'MULTIPLE';
 export type ResultReleasePolicy = 'DETAILED_AFTER_SUBMISSION' | 'SCORE_ONLY' | 'TEACHER_REVIEW' | 'IMMEDIATE_PER_QUESTION';
 export type AssignmentReviewStatus = 'PENDING' | 'NOT_REVIEWED' | 'REVIEWED';
@@ -106,6 +107,8 @@ export interface LearningResourceSummary {
   shareCode: string | null;
   publishedAt: string | null;
   themeId: QuizTheme;
+  /** Null means this resource follows the tenant-wide theme. */
+  themeOverrideId?: QuizTheme | null;
   assetUrl: string | null;
   externalUrl: string | null;
   attemptPolicy: AttemptPolicy;
@@ -118,6 +121,8 @@ export interface LearningResourceSummary {
   submissionDueAt: string | null;
   assignmentMaxScore: number;
   folderId: string | null;
+  /** Optional decorative cover selected by the administrator (1–30). */
+  displayBadgeId?: number | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -848,7 +848,7 @@ export const app = {
         const publishSettings = request.headers.get('content-type')?.includes('application/json') ? await parseJson(request) : {};
         const data=await resources.publish(session.data.tenant.id, resourceActionRoute[1]!, publishSettings);publicJoinCache.clear();return json(request, env, { success: true, data });
       }
-      const resourceLibraryRoute = /^\/api\/v1\/resources\/([0-9a-f-]{36})\/(metadata|folder)$/i.exec(url.pathname);
+      const resourceLibraryRoute = /^\/api\/v1\/resources\/([0-9a-f-]{36})\/(metadata|folder|badge)$/i.exec(url.pathname);
       if (request.method === 'PATCH' && resourceLibraryRoute) {
         const session = await authenticatedSession(request, env, auth);
         requirePermission(toTenantContext(session.data), 'resource.update');
@@ -858,7 +858,9 @@ export const app = {
         const body = await parseJson(request);
         const data = resourceLibraryRoute[2] === 'metadata'
           ? await resources.updateMetadata(session.data.tenant.id, resourceLibraryRoute[1]!, body)
-          : await resources.moveToFolder(session.data.tenant.id, resourceLibraryRoute[1]!, body);
+          : resourceLibraryRoute[2] === 'badge'
+            ? await resources.updateDisplayBadge(session.data.tenant.id, resourceLibraryRoute[1]!, body)
+            : await resources.moveToFolder(session.data.tenant.id, resourceLibraryRoute[1]!, body);
         return json(request, env, { success: true, data });
       }
       if ((request.method === 'GET' || request.method === 'PATCH' || request.method === 'DELETE') && url.pathname.startsWith('/api/v1/resources/')) {

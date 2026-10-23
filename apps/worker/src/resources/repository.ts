@@ -11,6 +11,7 @@ interface ResourceRow {
   shareCode: string | null;
   publishedAt: string | null;
   themeId: QuizTheme;
+  themeOverrideId: QuizTheme | null;
   assetUrl: string | null;
   externalUrl: string | null;
   attemptPolicy: AttemptPolicy;
@@ -23,16 +24,21 @@ interface ResourceRow {
   submissionDueAt: string | null;
   assignmentMaxScore: number;
   folderId: string | null;
+  displayBadgeId: number | null;
   createdAt: string;
   updatedAt: string;
 }
 
 const resourceSelect = `id, title, description, resource_type AS type, status, visibility,
-  share_code AS shareCode, published_at AS publishedAt, theme_id AS themeId, asset_url AS assetUrl,
+  share_code AS shareCode, published_at AS publishedAt,
+  COALESCE((SELECT theme_id FROM resource_theme_overrides WHERE resource_id = learning_resources.id),
+    (SELECT theme_id FROM tenant_theme_preferences WHERE tenant_id = learning_resources.tenant_id), theme_id) AS themeId,
+  (SELECT theme_id FROM resource_theme_overrides WHERE resource_id = learning_resources.id) AS themeOverrideId,
+  asset_url AS assetUrl,
   external_url AS externalUrl, attempt_policy AS attemptPolicy, result_release_policy AS resultReleasePolicy, access_starts_at AS accessStartsAt,
   replace_previous_attempts AS replacePreviousAttempts, music_track_id AS musicTrackId,
   (SELECT json_group_array(class_name) FROM resource_classes rc WHERE rc.resource_id=learning_resources.id) AS assignedClassesJson, assigned_class_name AS assignedClassName, submission_due_at AS submissionDueAt,
-  assignment_max_score AS assignmentMaxScore, folder_id AS folderId,
+  assignment_max_score AS assignmentMaxScore, folder_id AS folderId, display_badge_id AS displayBadgeId,
   created_at AS createdAt, updated_at AS updatedAt`;
 
 const resourceSummary = (row: ResourceRow): LearningResourceSummary => ({ ...row, assignedClassNames: JSON.parse(row.assignedClassesJson ?? '[]').length ? JSON.parse(row.assignedClassesJson!) : row.assignedClassName ? [normalizeClassName(row.assignedClassName)] : [], replacePreviousAttempts: Boolean(row.replacePreviousAttempts) });
@@ -79,11 +85,15 @@ export class ResourceRepository {
 
   async findPublishedContextByShareCode(shareCode: string): Promise<(LearningResourceDetail & { tenantId: string; tenantSlug: string; tenantName: string }) | null> {
     const row = await this.db.prepare(`SELECT r.id, r.title, r.description, r.resource_type AS type, r.status, r.visibility,
-      r.share_code AS shareCode, r.published_at AS publishedAt, r.theme_id AS themeId, r.asset_url AS assetUrl, r.external_url AS externalUrl,
+      r.share_code AS shareCode, r.published_at AS publishedAt,
+      COALESCE((SELECT theme_id FROM resource_theme_overrides WHERE resource_id = r.id),
+        (SELECT theme_id FROM tenant_theme_preferences WHERE tenant_id = r.tenant_id), r.theme_id) AS themeId,
+      (SELECT theme_id FROM resource_theme_overrides WHERE resource_id = r.id) AS themeOverrideId,
+      r.asset_url AS assetUrl, r.external_url AS externalUrl,
       r.attempt_policy AS attemptPolicy, r.result_release_policy AS resultReleasePolicy, r.access_starts_at AS accessStartsAt,
       r.replace_previous_attempts AS replacePreviousAttempts, r.music_track_id AS musicTrackId,
       (SELECT json_group_array(class_name) FROM resource_classes rc WHERE rc.resource_id=r.id) AS assignedClassesJson, r.assigned_class_name AS assignedClassName, r.submission_due_at AS submissionDueAt,
-      r.assignment_max_score AS assignmentMaxScore, r.folder_id AS folderId,
+      r.assignment_max_score AS assignmentMaxScore, r.folder_id AS folderId, r.display_badge_id AS displayBadgeId,
       r.created_at AS createdAt, r.updated_at AS updatedAt, r.content_json AS contentJson,
       r.tenant_id AS tenantId, t.slug AS tenantSlug, t.name AS tenantName
       FROM learning_resources r JOIN tenants t ON t.id = r.tenant_id
@@ -189,6 +199,12 @@ export class ResourceRepository {
   async updateMetadata(tenantId: string, resourceId: string, title: string, description: string | null): Promise<LearningResourceSummary | null> {
     await this.db.prepare('UPDATE learning_resources SET title = ?, description = ?, updated_at = CURRENT_TIMESTAMP WHERE tenant_id = ? AND id = ?')
       .bind(title, description, tenantId, resourceId).run();
+    return this.findById(tenantId, resourceId);
+  }
+
+  async updateDisplayBadge(tenantId: string, resourceId: string, badgeId: number | null): Promise<LearningResourceSummary | null> {
+    await this.db.prepare('UPDATE learning_resources SET display_badge_id = ?, updated_at = CURRENT_TIMESTAMP WHERE tenant_id = ? AND id = ?')
+      .bind(badgeId, tenantId, resourceId).run();
     return this.findById(tenantId, resourceId);
   }
 
@@ -304,20 +320,29 @@ export class ResourceRepository {
     return attempts.results.length;
   }
 
-  async updateTheme(tenantId: string, resourceId: string, themeId: QuizTheme): Promise<LearningResourceSummary | null> {
-    await this.db.prepare('UPDATE learning_resources SET theme_id = ?, updated_at = CURRENT_TIMESTAMP WHERE tenant_id = ? AND id = ?')
-      .bind(themeId, tenantId, resourceId).run();
+  async updateTheme(tenantId: string, resourceId: string, themeId: QuizTheme | null): Promise<LearningResourceSummary | null> {
+    if (!await this.findById(tenantId, resourceId)) return null;
+    if (themeId === null) {
+      await this.db.prepare('DELETE FROM resource_theme_overrides WHERE resource_id = ?').bind(resourceId).run();
+    } else {
+      await this.db.prepare(`INSERT INTO resource_theme_overrides (resource_id, theme_id) VALUES (?, ?)
+        ON CONFLICT(resource_id) DO UPDATE SET theme_id = excluded.theme_id, updated_at = CURRENT_TIMESTAMP`)
+        .bind(resourceId, themeId).run();
+    }
+    await this.db.prepare('UPDATE learning_resources SET updated_at = CURRENT_TIMESTAMP WHERE tenant_id = ? AND id = ?').bind(tenantId, resourceId).run();
     return this.findById(tenantId, resourceId);
   }
 
   async getThemeSettings(tenantId: string): Promise<TenantThemeSettings> {
-    return (await this.db.prepare('SELECT default_theme AS defaultTheme FROM tenant_settings WHERE tenant_id = ? LIMIT 1')
-      .bind(tenantId).first<TenantThemeSettings>()) ?? { defaultTheme: 'AURORA' };
+    return (await this.db.prepare(`SELECT COALESCE(
+      (SELECT theme_id FROM tenant_theme_preferences WHERE tenant_id = ?),
+      (SELECT default_theme FROM tenant_settings WHERE tenant_id = ?), 'AURORA') AS defaultTheme`)
+      .bind(tenantId, tenantId).first<TenantThemeSettings>()) ?? { defaultTheme: 'AURORA' };
   }
 
   async updateThemeSettings(tenantId: string, defaultTheme: QuizTheme): Promise<TenantThemeSettings> {
-    await this.db.prepare(`INSERT INTO tenant_settings (tenant_id, default_theme) VALUES (?, ?)
-      ON CONFLICT(tenant_id) DO UPDATE SET default_theme = excluded.default_theme, updated_at = CURRENT_TIMESTAMP`)
+    await this.db.prepare(`INSERT INTO tenant_theme_preferences (tenant_id, theme_id) VALUES (?, ?)
+      ON CONFLICT(tenant_id) DO UPDATE SET theme_id = excluded.theme_id, updated_at = CURRENT_TIMESTAMP`)
       .bind(tenantId, defaultTheme).run();
     return { defaultTheme };
   }
