@@ -1,4 +1,4 @@
-/* One lightweight, silent loop shared by Login and Home. The still remains available
+/* Lightweight, silent Login and Home loops. The still remains available
    when media cannot play or the visitor requests reduced motion. */
 .hero-artwork {
   position: relative;
@@ -66,11 +66,19 @@
 }
 .learning-landscape--artwork .learning-phone { z-index: 5; right: 3.5%; bottom: 4%; }
 
-/* Classic Home (reference 2.1): keep the existing copy/actions and dashboard below. */
-.app-shell .hero-card { grid-template-columns: minmax(0, 1fr) minmax(0, .88fr); min-height: 430px; gap: clamp(12px, 2vw, 30px); }
+/* Classic Home: the motion fills the card, while copy stays readable in front. */
+.app-shell .hero-card { display: flex; align-items: center; min-height: 430px; }
 .app-shell .hero-card::before { content: none; }
-.app-shell .hero-card__visual { display: block; min-width: 0; min-height: 0; }
-.hero-card__visual .hero-artwork { max-width: 660px; margin-left: auto; --hero-shadow: rgba(90, 62, 160, .27); --hero-halo: rgba(181, 149, 249, .26); }
+.app-shell .hero-card__copy { position: relative; z-index: 2; width: min(54%, 600px); }
+.app-shell .hero-card__visual { position: absolute; z-index: 0; inset: 0; display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; }
+.hero-card__visual .hero-artwork { width: 100%; height: 100%; aspect-ratio: auto; --hero-shadow: rgba(90, 62, 160, .27); --hero-halo: rgba(181, 149, 249, .26); }
+.hero-card__visual .hero-artwork__poster,
+.hero-card__visual .hero-artwork__video {
+  object-fit: cover;
+  object-position: center;
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, .16) 24%, rgba(0, 0, 0, .7) 52%, #000 76%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, .16) 24%, rgba(0, 0, 0, .7) 52%, #000 76%);
+}
 
 /* GlassWave Home (reference 2.2): the artwork is a real layout column, not an orb decoration. */
 .app-shell.glasswave-layout .glasswave-dashboard-hero {
@@ -108,24 +116,17 @@
 .glasswave-dashboard-hero__art .hero-artwork__poster,
 .glasswave-dashboard-hero__art .hero-artwork__video {
   object-fit: cover;
-  object-position: 50% 50%;
-  mask-image: linear-gradient(90deg, transparent 7%, rgba(0, 0, 0, .16) 25%, rgba(0, 0, 0, .83) 43%, #000 54%, #000 94%, rgba(0, 0, 0, .72) 100%);
-  -webkit-mask-image: linear-gradient(90deg, transparent 7%, rgba(0, 0, 0, .16) 25%, rgba(0, 0, 0, .83) 43%, #000 54%, #000 94%, rgba(0, 0, 0, .72) 100%);
+  object-position: center;
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, .16) 24%, rgba(0, 0, 0, .7) 52%, #000 76%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, .16) 24%, rgba(0, 0, 0, .7) 52%, #000 76%);
 }
 
 @media (max-width: 1050px) {
   .app-shell .hero-card { min-height: 365px; }
 }
 @media (max-width: 900px) {
-  .app-shell .hero-card { grid-template-columns: minmax(0, 1fr); }
-  .hero-card__visual .hero-artwork { max-width: 560px; margin: 0 auto; }
-  .app-shell.glasswave-layout .glasswave-dashboard-hero { display: grid; }
-  .app-shell.glasswave-layout .glasswave-dashboard-hero::after { content: none; }
-  .glasswave-dashboard-hero__content { width: 100%; }
-  .app-shell.glasswave-layout .glasswave-dashboard-hero .glasswave-dashboard-hero__art { position: relative; inset: auto; width: 100%; height: auto; max-width: 560px; margin: 0 auto; }
-  .glasswave-dashboard-hero__art .hero-artwork { height: auto; aspect-ratio: 1158 / 868; }
-  .glasswave-dashboard-hero__art .hero-artwork__poster,
-  .glasswave-dashboard-hero__art .hero-artwork__video { object-fit: contain; mask-image: radial-gradient(ellipse 75% 74% at 50% 50%, #000 57%, rgba(0, 0, 0, .92) 70%, transparent 100%); -webkit-mask-image: radial-gradient(ellipse 75% 74% at 50% 50%, #000 57%, rgba(0, 0, 0, .92) 70%, transparent 100%); }
+  .app-shell .hero-card__copy { width: min(62%, 560px); }
+  .glasswave-dashboard-hero__content { width: min(68%, 560px); }
 }
 @media (max-width: 760px) {
   .login-page.premium-auth .learning-landscape--artwork {
@@ -137,11 +138,18 @@
   }
   .learning-landscape--artwork .hero-artwork { max-width: none; }
   .learning-landscape--artwork .learning-phone { right: 4%; bottom: 5%; }
-  .app-shell .hero-card { padding: 28px 23px; }
-  .app-shell .hero-card__visual { display: block; }
-  .hero-card__visual .hero-artwork { max-width: 470px; }
-  .app-shell.glasswave-layout .glasswave-dashboard-hero { padding: 28px 22px; }
-  .app-shell.glasswave-layout .glasswave-dashboard-hero .glasswave-dashboard-hero__art { display: block; }
+  .app-shell .hero-card { min-height: 390px; padding: 28px 23px; }
+  .app-shell .hero-card__copy { width: 100%; }
+  .app-shell.glasswave-layout .glasswave-dashboard-hero { min-height: 390px; padding: 28px 22px; }
+  .glasswave-dashboard-hero__content { width: 100%; }
+  .app-shell.glasswave-layout .glasswave-dashboard-hero::after { background: linear-gradient(90deg, rgba(226, 247, 255, .98), rgba(214, 236, 255, .88) 58%, rgba(214, 236, 255, .18)); }
+  .hero-card__visual .hero-artwork__poster,
+  .hero-card__visual .hero-artwork__video,
+  .glasswave-dashboard-hero__art .hero-artwork__poster,
+  .glasswave-dashboard-hero__art .hero-artwork__video {
+    mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, .12) 40%, rgba(0, 0, 0, .5) 72%, #000 100%);
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, .12) 40%, rgba(0, 0, 0, .5) 72%, #000 100%);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .hero-artwork__video { display: none; }
