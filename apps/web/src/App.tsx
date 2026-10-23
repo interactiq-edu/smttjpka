@@ -170,7 +170,7 @@ function HeroArtwork({ variant }: { variant: 'login' | 'home' }) {
     <img className="hero-artwork__poster" src={publicAsset(`assets/${variant === 'login' ? 'login-hero' : 'home-hero'}.webp`)} alt="" decoding="async" />
     {!reducedMotion && <video
       className="hero-artwork__video"
-      src={publicAsset(variant === 'home' ? 'assets/home-motion.mp4' : 'assets/hero-motion.mp4')}
+      src={publicAsset(variant === 'home' ? 'assets/home-motion.mp4' : 'assets/login-motion.mp4')}
       autoPlay
       muted
       loop
